@@ -45,7 +45,7 @@ import net.geecode.framework.lite.Yii;
  * @package system.i18n
  * @since 1.0
  */
-class CLocale extends CComponent
+public class CLocale extends CComponent
 {
     /**
      * @var string the directory that contains the locale data. If this property is not set,

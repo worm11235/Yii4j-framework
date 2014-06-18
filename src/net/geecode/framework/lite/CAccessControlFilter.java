@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 
+import net.geecode.framework.base.CApplication;
 import net.geecode.framework.base.CComponent;
 import static net.geecode.php.base.Global.*;
 
@@ -50,7 +51,7 @@ class CWebApplication extends CApplication
     public String layout="main";
     public Map controllerMap=array();
     public Map catchAllRequest;
-    public $controllerNamespace;
+    public controllerNamespace;
     private String _controllerPath;
     private String _viewPath;
     private String _systemViewPath;

@@ -47,7 +47,7 @@ public class YiiBase
         return $class.getConstructor(new Class[]{$config.getClass()}).newInstance($config);
     }
     
-    public static Object app()
+    public static CApplication app()
     {
         return _app;
     }
@@ -297,6 +297,16 @@ public class YiiBase
             }
         }
         _logger.log($msg,$level,$category);
+    }
+    
+    public static void log(String msg, String level/*=CLogger::LEVEL_INFO*/)
+    {
+        log(msg, level, "application");
+    }
+    
+    public static void log(String msg)
+    {
+        log(msg, CLogger.LEVEL_INFO);
     }
     
     public static void beginProfile(String $token, String $category/*="application"*/)

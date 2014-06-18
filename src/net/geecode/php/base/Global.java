@@ -5,9 +5,12 @@ package net.geecode.php.base;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * @author David
@@ -17,18 +20,33 @@ public final class Global
 {
 
     public static final long YII_BEGIN_TIME = System.currentTimeMillis()/*microtime(true)*/;
+    
     public static final boolean YII_DEBUG = false;
+    
     public static final int YII_TRACE_LEVEL = 0;
+    
     public static final boolean YII_ENABLE_EXCEPTION_HANDLER = true;
+    
     public static final boolean YII_ENABLE_ERROR_HANDLER = true;
+    
     public static final String YII_PATH = /*dirname(__FILE__)*/"./";
+    
     public static final String DIRECTORY_SEPARATOR = File.separator;
+    
     public static final String YII_ZII_PATH = YII_PATH + DIRECTORY_SEPARATOR + "zii";
+    
+    public static final int PREG_SPLIT_NO_EMPTY = 1;
+    
     public static Map<String, Object> $_SERVER;
     
     public static boolean isset(Collection c, Object obj)
     {
         return c.contains(obj);
+    }
+    
+    public static boolean isset(List c, int obj)
+    {
+        return c.size() > obj && null != c.get(obj);
     }
     
     public static boolean isset(Map c, Object key)
@@ -51,6 +69,30 @@ public final class Global
         return str.replaceAll(find, rp);
     }
     
+    public static String str_replace(List<String> find, String rp, String str)
+    {
+        for (String sf : find)
+        {
+            str = str.replaceAll(sf, rp);
+        }
+        return str;
+    }
+    
+    public static String preg_replace (String find, String rp, String str)
+    {
+        return str.replaceAll(find, rp);
+    }
+    
+    public static boolean preg_match(String regex, String str)
+    {
+        return str.matches(regex);
+    }
+    
+    public static String trim(String str)
+    {
+        return str.trim();
+    }
+    
     public static String rtrim(String str, String regex)
     {
         if (str.endsWith(regex))
@@ -63,6 +105,50 @@ public final class Global
     public static String[] explode(String sp, String str)
     {
         return str.split(sp);
+    }
+    
+    public static String[] preg_split(String regex, String str, int limit, int flag)
+    {
+        return str.split(regex, limit);
+    }
+    
+    public static String implode(String insert, Collection col)
+    {
+        String str = "";
+        for (Object ojb : col)
+        {
+            str += ojb + insert;
+        }
+        if (str.length() > insert.length())
+        {
+            str = str.substring(0, str.length() - insert.length() - 1);
+        }
+        
+        return str;
+    }
+    
+    public static String implode(String insert, Object[] col)
+    {
+        return implode(insert, Arrays.asList(col));
+    }
+    
+    public static String implode(String insert, Map<String, Object> col)
+    {
+        return implode(insert, col.values());
+    }
+    
+    public static String strtr(String str, String sch, String rpl)
+    {
+        return str.replaceAll(sch, rpl);
+    }
+    
+    public static String strtr(String str, Map<String, Object> rpl)
+    {
+        for (Entry<String, Object> et : rpl.entrySet())
+        {
+            str.replaceAll(et.getKey(), et.getValue() + "");
+        }
+        return str;
     }
     
     public static void echo(String str)
@@ -127,7 +213,7 @@ public final class Global
     
     public static boolean is_array(Object obj)
     {
-        return obj.getClass().isArray();
+        return obj instanceof List;
     }
     
     public static Map<String, Object> array(Object ... params)
@@ -159,6 +245,21 @@ public final class Global
     public static int strpos(String org, String find)
     {
         return org.indexOf(find);
+    }
+    
+    public static int stripos(String org, String find)
+    {
+        return org.toLowerCase().indexOf(find.toLowerCase());
+    }
+    
+    public static int stripos(String org, String find, int start)
+    {
+        return org.toLowerCase().indexOf(find.toLowerCase(), start);
+    }
+    
+    public static int strrpos(String org, String find)
+    {
+        return org.lastIndexOf(find);
     }
     
     public static int strlen(String str)

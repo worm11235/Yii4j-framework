@@ -3,8 +3,13 @@
  */
 package net.geecode.framework.lite;
 
+import java.sql.Connection;
+import java.sql.Driver;
 import java.util.Map;
 
+import net.geecode.framework.db.CDbException;
+import net.geecode.framework.db.schema.CDbSchema;
+import net.geecode.framework.lite.CHttpRequest.CBaseActiveRelation.CStatRelation.CActiveRelation.CHasManyRelation.CActiveRecordMetaData.CDbSchema.CSqliteSchema.CDbCommand;
 import static net.geecode.php.base.Global.*;
 
 /**
@@ -18,7 +23,7 @@ public class CDbConnection extends CApplicationComponent
     public String password="";
     public int schemaCachingDuration=0;
     public Map schemaCachingExclude = array();
-    public String $schemaCacheID="cache";
+    public String schemaCacheID="cache";
     public int queryCachingDuration=0;
     public Map queryCachingDependency;
     public int queryCachingCount=0;
@@ -30,7 +35,7 @@ public class CDbConnection extends CApplicationComponent
     public boolean enableProfiling=false;
     public String tablePrefix;
     public Map initSQLs;
-    public Map<String, String> driverMap=array(
+    public Map<String, Object> driverMap=array(
         "pgsql","CPgsqlSchema",    // PostgreSQL
         "mysqli","CMysqlSchema",   // MySQL
         "mysql","CMysqlSchema",    // MySQL
@@ -46,7 +51,9 @@ public class CDbConnection extends CApplicationComponent
     private boolean _active=false;
     private Map _pdo;
     private Object _transaction;
-    private Object _schema;
+    private CDbSchema _schema;
+    
+    private Connection conn;
     
     public CDbConnection(String dsn/* = ""*/, String username/*=''*/,String password/*=''*/)
     {
@@ -123,6 +130,7 @@ public class CDbConnection extends CApplicationComponent
         this._pdo=null;
         this._active=false;
         this._schema=null;
+        conn.close();
     }
     protected PDO createPdoInstance()
     {
@@ -145,38 +153,34 @@ public class CDbConnection extends CApplicationComponent
         return $instance;
     }
     
-    protected function initConnection($pdo)
+    protected void initConnection(PDO pdo)
     {
         $pdo.setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        if($this.emulatePrepare!==null && constant('PDO::ATTR_EMULATE_PREPARES'))
+        if($this.emulatePrepare!=null && constant('PDO::ATTR_EMULATE_PREPARES'))
             $pdo.setAttribute(PDO::ATTR_EMULATE_PREPARES,$this.emulatePrepare);
-        if($this.charset!==null)
+        if($this.charset!=null)
         {
             $driver=strtolower($pdo.getAttribute(PDO::ATTR_DRIVER_NAME));
             if(in_array($driver,array('pgsql','mysql','mysqli')))
                 $pdo.exec('SET NAMES '.$pdo.quote($this.charset));
         }
-        if($this.initSQLs!==null)
+        if($this.initSQLs!=null)
         {
             foreach($this.initSQLs as $sql)
                 $pdo.exec($sql);
         }
     }
-    public function getPdoInstance()
-    {
-        return $this._pdo;
-    }
-    public function createCommand($query=null)
+    public CDbCommand createCommand($query=null)
     {
         $this.setActive(true);
         return new CDbCommand($this,$query);
     }
     public function getCurrentTransaction()
     {
-        if($this._transaction!==null)
+        if(this._transaction!=null)
         {
-            if($this._transaction.getActive())
-                return $this._transaction;
+            if(this._transaction.getActive())
+                return this._transaction;
         }
         return null;
     }
@@ -186,21 +190,21 @@ public class CDbConnection extends CApplicationComponent
         $this._pdo.beginTransaction();
         return $this._transaction=new CDbTransaction($this);
     }
-    public function getSchema()
+    public CDbSchema getSchema()
     {
-        if($this._schema!==null)
-            return $this._schema;
+        if(this._schema!=null)
+            return this._schema;
         else
         {
-            $driver=$this.getDriverName();
+            Driver driver = this.getDriverName();
             if(isset($this.driverMap[$driver]))
-                return $this._schema=Yii::createComponent($this.driverMap[$driver], $this);
+                return this._schema = Yii.createComponent(this.driverMap[$driver], this);
             else
-                throw new CDbException(Yii::t('yii','CDbConnection does not support reading schema for {driver} database.',
-                    array('{driver}'=>$driver)));
+                throw new CDbException(Yii.t("yii", "CDbConnection does not support reading schema for {driver} database.",
+                    array("{driver}", $driver)));
         }
     }
-    public function getCommandBuilder()
+    public CDbCommandBuilder getCommandBuilder()
     {
         return $this.getSchema().getCommandBuilder();
     }
@@ -214,7 +218,7 @@ public class CDbConnection extends CApplicationComponent
         if(is_int($str) || is_float($str))
             return $str;
         $this.setActive(true);
-        if(($value=$this._pdo.quote($str))!==false)
+        if(($value=$this._pdo.quote($str))!=false)
             return $value;
         else  // the driver doesn't support quote (e.g. oci)
             return "'" . addcslashes(str_replace("'", "''", $str), "\000\n\r\\\032") . "'";
@@ -227,17 +231,17 @@ public class CDbConnection extends CApplicationComponent
     {
         return $this.getSchema().quoteColumnName($name);
     }
-    public function getPdoType($type)
+    public function getPdoType(String type)
     {
-        static $map=array
+        Map map=array
         (
-            'boolean'=>PDO::PARAM_BOOL,
-            'integer'=>PDO::PARAM_INT,
-            'string'=>PDO::PARAM_STR,
-            'resource'=>PDO::PARAM_LOB,
-            'NULL'=>PDO::PARAM_NULL,
+            "boolean", PDO::PARAM_BOOL,
+            "integer", PDO::PARAM_INT,
+            "string", PDO::PARAM_STR,
+            "resource", PDO::PARAM_LOB,
+            "NULL", PDO::PARAM_NULL
         );
-        return isset($map[$type]) ? $map[$type] : PDO::PARAM_STR;
+        return isset($map[$type]) ? map[type] : PDO::PARAM_STR;
     }
     public function getColumnCase()
     {
@@ -267,19 +271,19 @@ public class CDbConnection extends CApplicationComponent
     {
         return $this.getAttribute(PDO::ATTR_PERSISTENT);
     }
-    public function setPersistent($value)
+    public void setPersistent(Object value)
     {
-        return $this.setAttribute(PDO::ATTR_PERSISTENT,$value);
+        return this.setAttribute(PDO::ATTR_PERSISTENT, value);
     }
-    public function getDriverName()
+    public String getDriverName()
     {
-        if(($pos=strpos($this.connectionString, ':'))!==false)
+        if(($pos=strpos(this.connectionString, ':'))!=false)
             return strtolower(substr($this.connectionString, 0, $pos));
         // return $this.getAttribute(PDO::ATTR_DRIVER_NAME);
     }
     public function getClientVersion()
     {
-        return $this.getAttribute(PDO::ATTR_CLIENT_VERSION);
+        return this.getAttribute(PDO::ATTR_CLIENT_VERSION);
     }
     public function getConnectionStatus()
     {
@@ -299,7 +303,7 @@ public class CDbConnection extends CApplicationComponent
     }
     public function getTimeout()
     {
-        return $this.getAttribute(PDO::ATTR_TIMEOUT);
+        return this.getAttribute(PDO::ATTR_TIMEOUT);
     }
     public function getAttribute($name)
     {

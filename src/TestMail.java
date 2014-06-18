@@ -2,6 +2,7 @@
  * @author seyo
  *
  */
+import java.awt.image.BufferedImage;
 import java.util.Properties;
 
 import javax.activation.DataHandler;
@@ -285,7 +286,9 @@ public class TestMail
      */
     public static void main(String[] args)
     {
-
+        BufferedImage image = new BufferedImage(100, 200, BufferedImage.TYPE_INT_BGR);
+        image.getGraphics();
+        
         String mailbody = "测试";
 
         TestMail themail = new TestMail("pop3.sina.com"); // 邮件服务器

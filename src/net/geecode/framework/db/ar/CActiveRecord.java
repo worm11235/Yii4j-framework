@@ -8,9 +8,22 @@
  */
 package net.geecode.framework.db.ar;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import net.geecode.framework.base.CComponent;
+import net.geecode.framework.db.CDbException;
+import net.geecode.framework.db.schema.CDbCommandBuilder;
+import net.geecode.framework.db.schema.CDbCriteria;
 import net.geecode.framework.lite.CDbConnection;
+import net.geecode.framework.lite.CEvent;
+import net.geecode.framework.lite.CModel;
+import net.geecode.framework.lite.Yii;
 import static net.geecode.php.base.Global.*;
 
 /**
@@ -57,15 +70,24 @@ abstract class CActiveRecord extends CModel
      */
     public static CDbConnection db;
 
-    private static Map<String, Object> _models = array();            // class name => model
-    private static Map<String, Object> _md = array();                // class name => meta data
-
-    private boolean _new=false;                        // whether this instance is new or not
-    private Map<String, Object> _attributes = array();               // attribute name => attribute value
-    private Map<String, Object> _related = array();                  // attribute name => related objects
-    private CDbCriteria _c;                                // query criteria (used by finder only)
-    private String _pk;                               // old primary key value
-    private String _alias = "t";                        // the table alias being used for query
+    // class name => model
+    private static Map<String, CActiveRecord> _models =
+            new HashMap<String, CActiveRecord>();
+    // class name => meta data
+    private static Map<String, CActiveRecordMetaData> _md =
+            new HashMap<String, CActiveRecordMetaData>();
+    // whether this instance is new or not
+    private boolean _new=false;
+    // attribute name => attribute value
+    private Map<String, Object> _attributes = array();
+    // attribute name => related objects
+    private Map<String, Object> _related = array();
+    // query criteria (used by finder only)
+    private CDbCriteria _c;
+    // old primary key value
+    private String _pk;
+    // the table alias being used for query
+    private String _alias = "t";
 
 
     /**
@@ -79,76 +101,76 @@ abstract class CActiveRecord extends CModel
         if (scenario == null) // internally used by populateRecord() and model()
             return;
         
-        this.setScenario($scenario);
-        $this.setIsNewRecord(true);
-        $this._attributes=$this.getMetaData().attributeDefaults;
+        this.setScenario(scenario);
+        this.setIsNewRecord(true);
+        this._attributes = this.getMetaData().attributeDefaults;
         
-        $this.init();
+        this.init();
 
-        $this.attachBehaviors($this.behaviors());
-        $this.afterConstruct();
+        this.attachBehaviors(this.behaviors());
+        this.afterConstruct();
     }
 
-             /**
-              * Initializes this model.
-              * This method is invoked when an AR instance is newly created and has
-              * its {@link scenario} set.
-              * You may override this method to provide code that is needed to initialize the model (e.g. setting
-              * initial property values.)
-              */
-             public void init()
-             {
-             }
+    /**
+     * Initializes this model.
+     * This method is invoked when an AR instance is newly created and has
+     * its {@link scenario} set.
+     * You may override this method to provide code that is needed to initialize the model (e.g. setting
+     * initial property values.)
+     */
+    public void init()
+    {
+    }
 
-             /**
-              * Sets the parameters about query caching.
-              * This is a shortcut method to {@link CDbConnection::cache()}.
-              * It changes the query caching parameter of the {@link dbConnection} instance.
-              * @param integer $duration the number of seconds that query results may remain valid in cache.
-              * If this is 0, the caching will be disabled.
-              * @param CCacheDependency|ICacheDependency $dependency the dependency that will be used when saving
-              * the query results into cache.
-              * @param integer $queryCount number of SQL queries that need to be cached after calling this method. Defaults to 1,
-              * meaning that the next SQL query will be cached.
-              * @return CActiveRecord the active record instance itself.
-              * @since 1.1.7
-              */
-             public CActiveRecord cache(int duration, CCacheDependency dependency/*=null*/, int queryCount/*=1*/)
-             {
-                 this.getDbConnection().cache(duration, dependency, queryCount);
-                 return this;
-             }
+    /**
+     * Sets the parameters about query caching.
+     * This is a shortcut method to {@link CDbConnection::cache()}.
+     * It changes the query caching parameter of the {@link dbConnection} instance.
+     * @param integer $duration the number of seconds that query results may remain valid in cache.
+     * If this is 0, the caching will be disabled.
+     * @param CCacheDependency|ICacheDependency $dependency the dependency that will be used when saving
+     * the query results into cache.
+     * @param integer $queryCount number of SQL queries that need to be cached after calling this method. Defaults to 1,
+     * meaning that the next SQL query will be cached.
+     * @return CActiveRecord the active record instance itself.
+     * @since 1.1.7
+     */
+    public CActiveRecord cache(int duration, CCacheDependency dependency/*=null*/, int queryCount/*=1*/)
+    {
+        this.getDbConnection().cache(duration, dependency, queryCount);
+        return this;
+    }
 
-             /**
-              * PHP sleep magic method.
-              * This method ensures that the model meta data reference is set to null.
-              * @return array
-              */
-             public Map __sleep()
-             {
-                 return array_keys((array)this);
-             }
+    /**
+     * PHP sleep magic method.
+     * This method ensures that the model meta data reference is set to null.
+     * @return array
+     */
+    public Map __sleep()
+    {
+        return array_keys((array)this);
+    }
 
-             /**
-              * PHP getter magic method.
-              * This method is overridden so that AR attributes can be accessed like properties.
-              * @param string $name property name
-              * @return mixed property value
-              * @see getAttribute
-              */
-             public Object __get(String name)
-             {
-                 if(isset($this._attributes[$name]))
-                     return $this._attributes[$name];
-                 elseif(isset($this.getMetaData().columns[$name]))
-                     return null;
-                 elseif(isset($this._related[$name]))
-                     return $this._related[$name];
-                 elseif(isset($this.getMetaData().relations[$name]))
-                     return $this.getRelated($name);
-                 else
-                     return parent::__get($name);
-             }
+    /**
+     * PHP getter magic method.
+     * This method is overridden so that AR attributes can be accessed like properties.
+     * @param string $name property name
+     * @return mixed property value
+     * @see getAttribute
+     */
+    public Object __get(String name)
+    {
+        if(isset(this._attributes, name))
+            return this._attributes.get(name);
+        else if(isset(this.getMetaData().columns, name))
+            return null;
+        else if(isset(this._related, name))
+            return this._related.get(name);
+        else if(isset(this.getMetaData().relations, name))
+            return this.getRelated(name, false);
+        else
+            return super.__get(name);
+    }
 
              /**
               * PHP setter magic method.
@@ -158,12 +180,12 @@ abstract class CActiveRecord extends CModel
               */
              public void __set(String name, Object value)
              {
-                 if($this.setAttribute($name,$value)===false)
+                 if(this.setAttribute(name, value) == false)
                  {
-                     if(isset($this.getMetaData().relations[$name]))
-                         $this._related[$name]=$value;
+                     if(isset(this.getMetaData().relations, name))
+                         this._related.put(name, value);
                      else
-                         parent::__set($name,$value);
+                         super.__set(name, value);
                  }
              }
 
@@ -185,7 +207,7 @@ abstract class CActiveRecord extends CModel
                  else if(isset($this.getMetaData().relations[$name]))
                      return $this.getRelated($name)!=null;
                  else
-                     return parent::__isset($name);
+                     return super.__isset($name);
              }
 
              /**
@@ -201,7 +223,7 @@ abstract class CActiveRecord extends CModel
                  else if(isset(this.getMetaData().relations[name]))
                      unset(this._related[name]);
                  else
-                     parent::__unset(name);
+                     super.__unset(name);
              }
 
              /**
@@ -214,22 +236,22 @@ abstract class CActiveRecord extends CModel
               */
              public Object __call(String name, Object ... parameters)
              {
-                 if(isset(this.getMetaData().relations[name]))
+                 if(isset(this.getMetaData().relations, name))
                  {
-                     if(empty(parameters))
+                     if(/*empty*/(parameters.length < 1))
                          return this.getRelated(name, false);
                      else
                          return this.getRelated(name, false, parameters[0]);
                  }
 
-                 scopes = this.scopes();
-                 if(isset(scopes[name]))
+                 Map<String, Object> scopes = this.scopes();
+                 if(isset(scopes, name))
                  {
-                     $this.getDbCriteria().mergeWith($scopes[$name]);
-                     return $this;
+                     this.getDbCriteria().mergeWith((CDbCriteria) scopes.get(name));
+                     return this;
                  }
 
-                 return parent::__call($name,$parameters);
+                 return super.__call(name, parameters);
              }
 
              /**
@@ -254,60 +276,67 @@ abstract class CActiveRecord extends CModel
               */
              public Object getRelated(String name, boolean refresh/*=false*/, Object params/*=array()*/)
              {
-                 if(!refresh && params==array() && (isset(this._related[name])
+                 if(!refresh && params==array() && (isset(this._related, name)
                          || array_key_exists(name, this._related)))
-                     return this._related[name];
+                     return this._related.get(name);
 
-                 md = this.getMetaData();
-                 if(!isset(md.relations[name]))
-                     throw new CDbException(Yii::t("yii","{class} does not have relation \"{name}\".",
+                 CActiveRecordMetaData md = this.getMetaData();
+                 if(!isset(md.relations, name))
+                     throw new CDbException(Yii.t("yii","{class} does not have relation \"{name}\".",
                          array("{class}", get_class(this), "{name}", name)));
 
                  Yii.trace("lazy loading " + get_class(this) + "." + name, "system.db.ar.CActiveRecord");
-                 relation = md.relations[name];
+                 Object relation = md.relations.get(name);
                  if(this.getIsNewRecord() && !refresh
                          && (relation instanceof CHasOneRelation || relation instanceof CHasManyRelation))
                      return relation instanceof CHasOneRelation ? null : array();
 
+                 Object r;
                  if(params!=array()) // dynamic query
                  {
-                     exists = isset(this._related[name]) || array_key_exists(name, this._related);
-                     if($exists)
-                         $save=$this._related[$name];
+                     boolean exists = isset(this._related, name) || array_key_exists(name, this._related);
+                     Object save;
+                     if (exists)
+                         save = this._related.get(name);
 
-                     if($params instanceof CDbCriteria)
-                         $params = $params.toArray();
+                     if (params instanceof CDbCriteria)
+                         params = ((CDbCriteria)params).toArray();
 
-                     $r=array($name=>$params);
+                     r = array(name, params);
                  }
                  else
-                     $r=$name;
-                 unset($this._related[$name]);
+                     r = name;
+                 this._related.remove(name);
 
-                 $finder=$this.getActiveFinder($r);
-                 $finder.lazyFind($this);
+                 CActiveFinder finder = this.getActiveFinder(r);
+                 finder.lazyFind(this);
 
-                 if(!isset($this._related[$name]))
+                 if(!isset(this._related, name))
                  {
-                     if($relation instanceof CHasManyRelation)
-                         $this._related[$name]=array();
-                     elseif($relation instanceof CStatRelation)
-                         $this._related[$name]=$relation.defaultValue;
+                     if(relation instanceof CHasManyRelation)
+                         this._related.put(name, array());
+                     else if(relation instanceof CStatRelation)
+                         this._related.put(name, relation.defaultValue);
                      else
-                         $this._related[$name]=null;
+                         this._related.put(name, null);
                  }
 
-                 if($params!==array())
+                 if (params != array())
                  {
-                     $results=$this._related[$name];
-                     if($exists)
-                         $this._related[$name]=$save;
+                     results = this._related.get(name);
+                     if(exists)
+                         this._related.put(name, save);
                      else
-                         unset($this._related[$name]);
-                     return $results;
+                         this._related.remove(name);
+                     return results;
                  }
                  else
-                     return $this._related[$name];
+                     return this._related.get(name);
+             }
+             
+             public Object getRelated(String name, boolean refresh/*=false*/)
+             {
+                 return getRelated(name, refresh, array());
              }
 
              /**
@@ -317,7 +346,8 @@ abstract class CActiveRecord extends CModel
               */
              public boolean hasRelated(String name)
              {
-                 return isset(this._related[name]) || array_key_exists(name, this._related);
+                 return isset(this._related, name)
+                         || array_key_exists(name, this._related);
              }
 
              /**
@@ -331,10 +361,15 @@ abstract class CActiveRecord extends CModel
              {
                  if(this._c == null)
                  {
+                     Map<String, Object> c;
                      if((c = this.defaultScope()) != array() || createIfNull)
                          this._c = new CDbCriteria(c);
                  }
                  return this._c;
+             }
+             public CDbCriteria getDbCriteria()
+             {
+                 return getDbCriteria(true);
              }
 
              /**
@@ -370,7 +405,7 @@ abstract class CActiveRecord extends CModel
              public CActiveRecord resetScope(boolean resetDefault/*=true*/)
              {
                  if (resetDefault)
-                     this._c = new CDbCriteria();
+                     this._c = new CDbCriteria(array());
                  else
                      this._c = null;
 
@@ -395,11 +430,12 @@ abstract class CActiveRecord extends CModel
               */
              public static CActiveRecord model(String className/*=__CLASS__*/)
              {
-                 if(isset(this._models[className]))
-                     return this._models[className];
+                 if(isset(CActiveRecord._models, className))
+                     return (CActiveRecord) CActiveRecord._models.get(className);
                  else
                  {
-                     model = this._models[className] = new className(null);
+                     CActiveRecord model = (CActiveRecord) Class.forName(className).newInstance();
+                     CActiveRecord._models.put(className, model/*] = new className(null*/);
                      model.attachBehaviors(model.behaviors());
                      return model;
                  }
@@ -411,13 +447,13 @@ abstract class CActiveRecord extends CModel
               */
              public CActiveRecordMetaData getMetaData()
              {
-                 className = get_class(this);
+                 String className = get_class(this).getName();
                  if(!array_key_exists(className, this._md))
                  {
-                     this._md[className] = null; // preventing recursive invokes of {@link getMetaData()} via {@link __get()}
-                     this._md[$className] = new CActiveRecordMetaData(this);
+                     this._md.put(className, null); // preventing recursive invokes of {@link getMetaData()} via {@link __get()}
+                     this._md.put(className, new CActiveRecordMetaData(this));
                  }
-                 return this._md[className];
+                 return (CActiveRecordMetaData) this._md.get(className);
              }
 
              /**
@@ -429,9 +465,9 @@ abstract class CActiveRecord extends CModel
               */
              public void refreshMetaData()
              {
-                 className = get_class(this);
-                 if(array_key_exists(className, this._md))
-                     unset(this._md[className]);
+                 Class className = get_class(this);
+                 if(this._md.containsKey(className.getName()))
+                     this._md.remove(className.getName());
              }
 
              /**
@@ -442,7 +478,7 @@ abstract class CActiveRecord extends CModel
               */
              public String tableName()
              {
-                 return get_class(this);
+                 return get_class(this).getName();
              }
 
              /**
@@ -587,7 +623,9 @@ abstract class CActiveRecord extends CModel
               */
              public List<String> attributeNames()
              {
-                 return array_keys($this.getMetaData().columns);
+                 List<String> list = new ArrayList<String>();
+                 list.addAll(this.getMetaData().columns.keySet());
+                 return list;
              }
 
              /**
@@ -603,13 +641,13 @@ abstract class CActiveRecord extends CModel
               */
              public String getAttributeLabel(String attribute)
              {
-                 $labels=$this.attributeLabels();
-                 if(isset($labels[$attribute]))
-                     return $labels[$attribute];
-                 else if(strpos($attribute,".")!==false)
+                 Map labels = this.attributeLabels();
+                 if(isset(labels, attribute))
+                     return (String) labels.get(attribute);
+                 else if(strpos(attribute, ".") != -1)
                  {
                      String[] segs = explode(".", attribute);
-                     name = array_pop(segs);
+                     Object name = array_pop(segs);
                      model = this;
                      for(String seg : segs)
                      {
@@ -638,11 +676,11 @@ abstract class CActiveRecord extends CModel
                      return db;
                  else
                  {
-                     db = Yii.app().getDb();
+                     db = (CDbConnection) Yii.app().getDb();
                      if(db instanceof CDbConnection)
                          return db;
                      else
-                         throw new CDbException(Yii::t("yii","Active Record requires a \"db\" CDbConnection"
+                         throw new CDbException(Yii.t("yii","Active Record requires a \"db\" CDbConnection"
                                  + " application component."));
                  }
              }
@@ -682,7 +720,7 @@ abstract class CActiveRecord extends CModel
               */
              public boolean hasAttribute(String name)
              {
-                 return isset(this.getMetaData().columns[name]);
+                 return isset(this.getMetaData().columns, name);
              }
 
              /**
@@ -698,10 +736,11 @@ abstract class CActiveRecord extends CModel
               */
              public Object getAttribute (String name)
              {
-                 if(property_exists($this,$name))
-                     return $this.$name;
-                 else if(isset($this._attributes[$name]))
-                     return $this._attributes[$name];
+                 Field f = this.getClass().getField(name);
+                 if (null != f)
+                     return f.get(this);
+                 else if(isset(this._attributes, name))
+                     return this._attributes.get(name);
              }
 
              /**
@@ -714,10 +753,13 @@ abstract class CActiveRecord extends CModel
               */
              public boolean setAttribute(String name, Object value)
              {
-                 if(property_exists(this, name))
-                     this.$name = value;
-                 else if(isset(this.getMetaData().columns[name]))
-                     this._attributes[name] = value;
+                 Field f = this.getClass().getField(name);
+                 if (null != f)
+                 {
+                     f.set(this, value);
+                 }
+                 else if(isset(this.getMetaData().columns, name))
+                     this._attributes.put(name, value);
                  else
                      return false;
                  return true;
@@ -746,7 +788,7 @@ abstract class CActiveRecord extends CModel
                              this._related[name][index] = record;
                      }
                  }
-                 else if(!isset(this._related[name]))
+                 else if(!isset(this._related, name))
                      this._related[name] = record;
              }
 
@@ -979,7 +1021,7 @@ abstract class CActiveRecord extends CModel
              {
                  if(this.hasEventHandler("onBeforeDelete"))
                  {
-                     event = new CModelEvent(this);
+                     CModelEvent event = new CModelEvent(this);
                      this.onBeforeDelete(event);
                      return event.isValid;
                  }
@@ -1013,7 +1055,7 @@ abstract class CActiveRecord extends CModel
              {
                  if(this.hasEventHandler("onBeforeFind"))
                  {
-                     event = new CModelEvent(this);
+                     CModelEvent event = new CModelEvent(this);
                      this.onBeforeFind (event);
                  }
              }
@@ -1088,7 +1130,7 @@ abstract class CActiveRecord extends CModel
                      if(command.execute())
                      {
                          primaryKey = table.primaryKey;
-                         if(table.sequenceName!==null)
+                         if(table.sequenceName != null)
                          {
                              if(is_string(primaryKey) && this.$primaryKey == null)
                                  this.$primaryKey = builder.getLastInsertID(table);
@@ -1164,16 +1206,18 @@ abstract class CActiveRecord extends CModel
                  if(!this.getIsNewRecord())
                  {
                      Yii.trace(get_class(this) + ".saveAttributes()", "system.db.ar.CActiveRecord");
-                     values = array();
-                     for ($attributes as $name=>$value)
+                     Map<String, Object> values = array();
+                     for (Entry<String, Object> et : attributes.entrySet()/* as $name=>$value*/)
                      {
-                         if(is_integer($name))
-                             $values[$value]=$this.$value;
+                         String name = et.getKey();
+                         Object value = et.getValue();
+                         if(is_integer(name))
+                             values[value]=$this.$value;
                          else
                              $values[$name]=$this.$name=$value;
                      }
-                     if($this._pk===null)
-                         $this._pk=$this.getPrimaryKey();
+                     if($this._pk==null)
+                         $this._pk = this.getPrimaryKey();
                      if($this.updateByPk($this.getOldPrimaryKey(),$values)>0)
                      {
                          $this._pk=$this.getPrimaryKey();
@@ -1230,7 +1274,7 @@ abstract class CActiveRecord extends CModel
                      Yii.trace(get_class(this) + ".delete()", "system.db.ar.CActiveRecord");
                      if(this.beforeDelete())
                      {
-                         result = this.deleteByPk(this.getPrimaryKey())>0;
+                         Object result = this.deleteByPk(this.getPrimaryKey())>0;
                          this.afterDelete();
                          return result;
                      }
@@ -1304,7 +1348,7 @@ abstract class CActiveRecord extends CModel
               * should be provided as an array (column name=>column value).
               * @since 1.1.0
               */
-             public void setPrimaryKey($value)
+             public void setPrimaryKey(Object value)
              {
                  this._pk = this.getPrimaryKey();
                  table = this.getMetaData().tableSchema;
@@ -1366,8 +1410,8 @@ abstract class CActiveRecord extends CModel
                  }
                  else
                  {
-                     $finder=$this.getActiveFinder($criteria.with);
-                     return $finder.query($criteria,$all);
+                     finder = this.getActiveFinder($criteria.with);
+                     return finder.query($criteria,$all);
                  }
              }
 
@@ -1377,7 +1421,7 @@ abstract class CActiveRecord extends CModel
               * It then resets {@link dbCriteria} to be null.
               * @param CDbCriteria $criteria the query criteria. This parameter may be modified by merging {@link dbCriteria}.
               */
-             public function applyScopes(&$criteria)
+             public void applyScopes(CDCriteria criteria)
              {
                  if(!empty($criteria.scopes))
                  {
@@ -1433,13 +1477,13 @@ abstract class CActiveRecord extends CModel
               * @return string the default table alias
               * @since 1.1.1
               */
-             public function getTableAlias($quote=false, $checkScopes=true)
+             public String getTableAlias(boolean quote/*=false*/, boolean checkScopes/*=true*/)
              {
-                 if($checkScopes && ($criteria=$this.getDbCriteria(false))!==null && $criteria.alias!="")
-                     $alias=$criteria.alias;
+                 if (checkScopes && (criteria = this.getDbCriteria(false)) != null && criteria.alias != "")
+                     alias = criteria.alias;
                  else
-                     $alias=$this._alias;
-                 return $quote ? $this.getDbConnection().getSchema().quoteTableName($alias) : $alias;
+                     alias = this._alias;
+                 return quote ? this.getDbConnection().getSchema().quoteTableName(alias) : alias;
              }
 
              /**
@@ -1447,9 +1491,9 @@ abstract class CActiveRecord extends CModel
               * @param string $alias the table alias to be used in queries. The alias should NOT be quoted.
               * @since 1.1.3
               */
-             public function setTableAlias($alias)
+             public void setTableAlias(String alias)
              {
-                 $this._alias=$alias;
+                 this._alias = alias;
              }
 
              /**
@@ -1463,11 +1507,11 @@ abstract class CActiveRecord extends CModel
               * In other cases, please use {@link CDbCriteria::params} to set parameters.
               * @return CActiveRecord the record found. Null if no record is found.
               */
-             public function find($condition="",$params=array())
+             public CActiveRecord find(Object condition/*=""*/, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".find()","system.db.ar.CActiveRecord");
-                 $criteria=$this.getCommandBuilder().createCriteria($condition,$params);
-                 return $this.query($criteria);
+                 Yii.trace(get_class(this) + ".find()", "system.db.ar.CActiveRecord");
+                 criteria = this.getCommandBuilder().createCriteria($condition,$params);
+                 return this.query($criteria);
              }
 
              /**
@@ -1477,11 +1521,11 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return CActiveRecord[] list of active records satisfying the specified condition. An empty array is returned if none is found.
               */
-             public function findAll($condition="",$params=array())
+             public CActiveRecord[] findAll(Object condition/*=""*/, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findAll()","system.db.ar.CActiveRecord");
-                 $criteria=$this.getCommandBuilder().createCriteria($condition,$params);
-                 return $this.query($criteria,true);
+                 Yii.trace(get_class(this) + ".findAll()", "system.db.ar.CActiveRecord");
+                 criteria = this.getCommandBuilder().createCriteria(condition, params);
+                 return this.query(criteria, true);
              }
 
              /**
@@ -1492,12 +1536,13 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return CActiveRecord the record found. Null if none is found.
               */
-             public function findByPk($pk,$condition="",$params=array())
+             public CActiveRecord findByPk(Object pk, Object condition/*=""*/, Map<String, Object> params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findByPk()","system.db.ar.CActiveRecord");
-                 $prefix=$this.getTableAlias(true).".";
-                 $criteria=$this.getCommandBuilder().createPkCriteria($this.getTableSchema(),$pk,$condition,$params,$prefix);
-                 return $this.query($criteria);
+                 Yii.trace(get_class(this) + ".findByPk()", "system.db.ar.CActiveRecord");
+                 prefix = this.getTableAlias(true) + ".";
+                 criteria = this.getCommandBuilder().createPkCriteria(this.getTableSchema(), pk,
+                         condition, params, prefix);
+                 return this.query(criteria);
              }
 
              /**
@@ -1508,12 +1553,13 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return CActiveRecord[] the records found. An empty array is returned if none is found.
               */
-             public function findAllByPk($pk,$condition="",$params=array())
+             public CActiveRecord[] findAllByPk(Object pk, Object condition/*=""*/, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findAllByPk()","system.db.ar.CActiveRecord");
-                 $prefix=$this.getTableAlias(true).".";
-                 $criteria=$this.getCommandBuilder().createPkCriteria($this.getTableSchema(),$pk,$condition,$params,$prefix);
-                 return $this.query($criteria,true);
+                 Yii.trace(get_class(this) + ".findAllByPk()", "system.db.ar.CActiveRecord");
+                 prefix = this.getTableAlias(true) + ".";
+                 criteria = this.getCommandBuilder().createPkCriteria(this.getTableSchema(),
+                         pk, condition, params, prefix);
+                 return this.query(criteria,true);
              }
 
              /**
@@ -1525,12 +1571,13 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return CActiveRecord the record found. Null if none is found.
               */
-             public function findByAttributes($attributes,$condition="",$params=array())
+             public CActiveRecord findByAttributes(Map attributes, Object condition/*=""*/, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findByAttributes()","system.db.ar.CActiveRecord");
-                 $prefix=$this.getTableAlias(true).".";
-                 $criteria=$this.getCommandBuilder().createColumnCriteria($this.getTableSchema(),$attributes,$condition,$params,$prefix);
-                 return $this.query($criteria);
+                 Yii.trace(get_class($this) + ".findByAttributes()", "system.db.ar.CActiveRecord");
+                 prefix = this.getTableAlias(true) + ".";
+                 criteria = this.getCommandBuilder().createColumnCriteria(this.getTableSchema(),
+                         attributes, condition, params, prefix);
+                 return this.query(criteria);
              }
 
              /**
@@ -1542,12 +1589,14 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return CActiveRecord[] the records found. An empty array is returned if none is found.
               */
-             public function findAllByAttributes($attributes,$condition="",$params=array())
+             public CActiveRecord findAllByAttributes(Map attributes, Object condition/*=""*/,
+                     Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findAllByAttributes()","system.db.ar.CActiveRecord");
-                 $prefix=$this.getTableAlias(true).".";
-                 $criteria=$this.getCommandBuilder().createColumnCriteria($this.getTableSchema(),$attributes,$condition,$params,$prefix);
-                 return $this.query($criteria,true);
+                 Yii.trace(get_class($this) + ".findAllByAttributes()", "system.db.ar.CActiveRecord");
+                 prefix = this.getTableAlias(true) + ".";
+                 criteria = this.getCommandBuilder().createColumnCriteria(this.getTableSchema(),
+                         attributes, condition, params, prefix);
+                 return this.query(criteria, true);
              }
 
              /**
@@ -1556,20 +1605,20 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to the SQL statement
               * @return CActiveRecord the record found. Null if none is found.
               */
-             public function findBySql($sql,$params=array())
+             public CActiveRecord findBySql(String sql, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findBySql()","system.db.ar.CActiveRecord");
-                 $this.beforeFind();
-                 if(($criteria=$this.getDbCriteria(false))!==null && !empty($criteria.with))
+                 Yii.trace(get_class($this) + ".findBySql()", "system.db.ar.CActiveRecord");
+                 this.beforeFind();
+                 if ((criteria = this.getDbCriteria(false)) != null && !empty(criteria.with))
                  {
-                     $this.resetScope(false);
-                     $finder=$this.getActiveFinder($criteria.with);
-                     return $finder.findBySql($sql,$params);
+                     this.resetScope(false);
+                     finder = this.getActiveFinder (criteria.with);
+                     return finder.findBySql (sql, params);
                  }
                  else
                  {
-                     $command=$this.getCommandBuilder().createSqlCommand($sql,$params);
-                     return $this.populateRecord($command.queryRow());
+                     command = this.getCommandBuilder().createSqlCommand(sql, params);
+                     return this.populateRecord(command.queryRow());
                  }
              }
 
@@ -1579,10 +1628,10 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to the SQL statement
               * @return CActiveRecord[] the records found. An empty array is returned if none is found.
               */
-             public function findAllBySql($sql,$params=array())
+             public CActiveRecord[] findAllBySql(String sql, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".findAllBySql()","system.db.ar.CActiveRecord");
-                 $this.beforeFind();
+                 Yii.trace(get_class($this) + ".findAllBySql()", "system.db.ar.CActiveRecord");
+                 this.beforeFind();
                  if(($criteria=$this.getDbCriteria(false))!==null && !empty($criteria.with))
                  {
                      $this.resetScope(false);
@@ -1603,10 +1652,10 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return string the number of rows satisfying the specified query condition. Note: type is string to keep max. precision.
               */
-             public function count($condition="",$params=array())
+             public String count(Object condition/*=""*/, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".count()","system.db.ar.CActiveRecord");
-                 $builder=$this.getCommandBuilder();
+                 Yii/trace(get_class($this) + ".count()","system.db.ar.CActiveRecord");
+                 builder=$this.getCommandBuilder();
                  $this.beforeCount();
                  $criteria=$builder.createCriteria($condition,$params);
                  $this.applyScopes($criteria);
@@ -1630,7 +1679,8 @@ abstract class CActiveRecord extends CModel
               * @return string the number of rows satisfying the specified query condition. Note: type is string to keep max. precision.
               * @since 1.1.4
               */
-             public function countByAttributes($attributes,$condition="",$params=array())
+             public String countByAttributes(Map<String, Object> attributes, Object condition/*=""*/,
+                     Map<String, Object>params/*=array()*/)
              {
                  Yii::trace(get_class($this).".countByAttributes()","system.db.ar.CActiveRecord");
                  $prefix=$this.getTableAlias(true).".";
@@ -1656,7 +1706,7 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to the SQL statement
               * @return string the number of rows using the given SQL statement. Note: type is string to keep max. precision.
               */
-             public function countBySql($sql,$params=array())
+             public String countBySql(String sql, Map<String, Object> params/*=array()*/)
              {
                  Yii::trace(get_class($this).".countBySql()","system.db.ar.CActiveRecord");
                  $this.beforeCount();
@@ -1670,9 +1720,9 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return boolean whether there is row satisfying the specified condition.
               */
-             public function exists($condition="",$params=array())
+             public boolean exists(Object condition/*=""*/, Map<String, Object> params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".exists()","system.db.ar.CActiveRecord");
+                 Yii.trace(get_class($this) + ".exists()","system.db.ar.CActiveRecord");
                  $builder=$this.getCommandBuilder();
                  $criteria=$builder.createCriteria($condition,$params);
                  $table=$this.getTableSchema();
@@ -1681,7 +1731,8 @@ abstract class CActiveRecord extends CModel
                  $this.applyScopes($criteria);
 
                  if(empty($criteria.with))
-                     return $builder.createFindCommand($table,$criteria,$this.getTableAlias(false, false)).queryRow()!==false;
+                     return builder.createFindCommand(table, criteria,
+                             this.getTableAlias(false, false)).queryRow()!=false;
                  else
                  {
                      $criteria.select="*";
@@ -1716,17 +1767,17 @@ abstract class CActiveRecord extends CModel
               *
               * @return CActiveRecord the AR object itself.
               */
-             public function with()
+             public CActiveRecord with(Object ... params)
              {
-                 if(func_num_args()>0)
+                 if(params.length>0)
                  {
-                     $with=func_get_args();
-                     if(is_array($with[0]))  // the parameter is given as an array
-                         $with=$with[0];
-                     if(!empty($with))
-                         $this.getDbCriteria().mergeWith(array("with"=>$with));
+                     Object[] with = params;
+                     if(is_array(with[0]))  // the parameter is given as an array
+                         with=(Object[]) with[0];
+                     if(!(with.length < 1))
+                         this.getDbCriteria().mergeWith(array("with", with));
                  }
-                 return $this;
+                 return this;
              }
 
              /**
@@ -1736,10 +1787,10 @@ abstract class CActiveRecord extends CModel
               * @return CActiveRecord the AR object itself
               * @since 1.1.4
               */
-             public function together()
+             public CActiveRecord together()
              {
-                 $this.getDbCriteria().together=true;
-                 return $this;
+                 this.getDbCriteria().together=true;
+                 return this;
              }
 
              /**
@@ -1790,7 +1841,7 @@ abstract class CActiveRecord extends CModel
               * @return integer the number of rows being updated
               * @see saveCounters
               */
-             public function updateCounters($counters,$condition="",$params=array())
+             public int updateCounters($counters,$condition="",$params=array())
              {
                  Yii::trace(get_class($this).".updateCounters()","system.db.ar.CActiveRecord");
                  $builder=$this.getCommandBuilder();
@@ -1807,11 +1858,11 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return integer the number of rows deleted
               */
-             public function deleteByPk($pk,$condition="",$params=array())
+             public int deleteByPk(Map<String, Object> pk, Object condition/*=""*/, Map params/*=array()*/)
              {
-                 Yii::trace(get_class($this).".deleteByPk()","system.db.ar.CActiveRecord");
-                 $builder=$this.getCommandBuilder();
-                 $criteria=$builder.createPkCriteria($this.getTableSchema(),$pk,$condition,$params);
+                 Yii.trace(get_class(this) + ".deleteByPk()", "system.db.ar.CActiveRecord");
+                 CDbCommandBuilder builder = this.getCommandBuilder();
+                 criteria = builder.createPkCriteria(this.getTableSchema(), pk, condition, params);
                  $command=$builder.createDeleteCommand($this.getTableSchema(),$criteria);
                  return $command.execute();
              }
@@ -1823,7 +1874,7 @@ abstract class CActiveRecord extends CModel
               * @param array $params parameters to be bound to an SQL statement.
               * @return integer the number of rows deleted
               */
-             public function deleteAll($condition="",$params=array())
+             public int deleteAll($condition="",$params=array())
              {
                  Yii::trace(get_class($this).".deleteAll()","system.db.ar.CActiveRecord");
                  $builder=$this.getCommandBuilder();
@@ -1859,26 +1910,29 @@ abstract class CActiveRecord extends CModel
               * @return CActiveRecord the newly created active record. The class of the object is the same as the model class.
               * Null is returned if the input data is false.
               */
-             public function populateRecord($attributes,$callAfterFind=true)
+             public CActiveRecord populateRecord(Map<String, Object> attributes, boolean callAfterFind/*=true*/)
              {
-                 if($attributes!==false)
+                 if(attributes != null)
                  {
-                     $record=$this.instantiate($attributes);
-                     $record.setScenario("update");
-                     $record.init();
-                     $md=$record.getMetaData();
-                     foreach($attributes as $name=>$value)
+                     record = this.instantiate(attributes);
+                     record.setScenario("update");
+                     record.init();
+                     md = record.getMetaData();
+                     for (Entry<String, Object> ent : attributes.entrySet()/* as name=>$value*/)
                      {
-                         if(property_exists($record,$name))
-                             $record.$name=$value;
-                         elseif(isset($md.columns[$name]))
-                             $record._attributes[$name]=$value;
+                         String name = ent.getKey();
+                         Object value = ent.getValue();
+                         if(property_exists(record, name))
+                             record.$name=$value;
+                         else if(isset($md.columns[$name]))
+                             record._attributes[$name]=$value;
                      }
-                     $record._pk=$record.getPrimaryKey();
-                     $record.attachBehaviors($record.behaviors());
-                     if($callAfterFind)
-                         $record.afterFind();
-                     return $record;
+                     
+                     record._pk = record.getPrimaryKey();
+                     record.attachBehaviors(record.behaviors());
+                     if(callAfterFind)
+                         record.afterFind();
+                     return record;
                  }
                  else
                      return null;
@@ -1893,10 +1947,10 @@ abstract class CActiveRecord extends CModel
               * If null, it means the array will be indexed by zero-based integers.
               * @return CActiveRecord[] list of active records.
               */
-             public function populateRecords($data,$callAfterFind=true,$index=null)
+             public CActiveRecord[] populateRecords(Map<String, Object> data, boolean callAfterFind/*=true*/, String index/*=null*/)
              {
-                 $records=array();
-                 foreach($data as $attributes)
+                 List<CActiveRecord> records = new ArrayList<CActiveRecord>();
+                 for ($data as $attributes)
                  {
                      if(($record=$this.populateRecord($attributes,$callAfterFind))!==null)
                      {
@@ -1906,7 +1960,7 @@ abstract class CActiveRecord extends CModel
                              $records[$record.$index]=$record;
                      }
                  }
-                 return $records;
+                 return records;
              }
 
              /**
@@ -1919,10 +1973,10 @@ abstract class CActiveRecord extends CModel
               * @param array $attributes list of attribute values for the active records.
               * @return CActiveRecord the active record
               */
-             protected function instantiate($attributes)
+             protected CActiveRecord instantiate(Map<String, Object> attributes)
              {
-                 $class=get_class($this);
-                 $model=new $class(null);
+                 cls=get_class(this);
+                 $model=new cls(null);
                  return $model;
              }
 
@@ -1932,9 +1986,9 @@ abstract class CActiveRecord extends CModel
               * @param mixed $offset the offset to check on
               * @return boolean
               */
-             public function offsetExists($offset)
+             public boolean offsetExists(Object offset)
              {
-                 return $this.__isset($offset);
+                 return this.__isset(offset);
              }
          }
 
@@ -1949,52 +2003,52 @@ abstract class CActiveRecord extends CModel
              /**
               * @var string name of the related object
               */
-             public $name;
+             public String name;
              /**
               * @var string name of the related active record class
               */
-             public $className;
+             public String className;
              /**
               * @var mixed the foreign key in this relation
               */
-             public $foreignKey;
+             public Object foreignKey;
              /**
               * @var mixed list of column names (an array, or a string of names separated by commas) to be selected.
               * Do not quote or prefix the column names unless they are used in an expression.
               * In that case, you should prefix the column names with 'relationName.'.
               */
-             public $select="*";
+             public Object select = "*";
              /**
               * @var string WHERE clause. For {@link CActiveRelation} descendant classes, column names
               * referenced in the condition should be disambiguated with prefix 'relationName.'.
               */
-             public $condition="";
+             public String condition = "";
              /**
               * @var array the parameters that are to be bound to the condition.
               * The keys are parameter placeholder names, and the values are parameter values.
               */
-             public $params=array();
+             public Map params = array();
              /**
               * @var string GROUP BY clause. For {@link CActiveRelation} descendant classes, column names
               * referenced in this property should be disambiguated with prefix 'relationName.'.
               */
-             public $group="";
+             public String group = "";
              /**
               * @var string how to join with other tables. This refers to the JOIN clause in an SQL statement.
               * For example, <code>'LEFT JOIN users ON users.id=authorID'</code>.
               * @since 1.1.3
               */
-             public $join="";
+             public String join = "";
              /**
               * @var string HAVING clause. For {@link CActiveRelation} descendant classes, column names
               * referenced in this property should be disambiguated with prefix 'relationName.'.
               */
-             public $having="";
+             public String having = "";
              /**
               * @var string ORDER BY clause. For {@link CActiveRelation} descendant classes, column names
               * referenced in this property should be disambiguated with prefix 'relationName.'.
               */
-             public $order="";
+             public String order = "";
 
              /**
               * Constructor.
@@ -2003,11 +2057,11 @@ abstract class CActiveRecord extends CModel
               * @param string $foreignKey foreign key for this relation
               * @param array $options additional options (name=>value). The keys must be the property names of this class.
               */
-             public function __construct($name,$className,$foreignKey,$options=array())
+             public CBaseActiveRecord(String name, String className, String foreignKey, Map options/*=array()*/)
              {
-                 $this.name=$name;
-                 $this.className=$className;
-                 $this.foreignKey=$foreignKey;
+                 this.name = name;
+                 this.className = className;
+                 this.foreignKey = foreignKey;
                  foreach($options as $name=>$value)
                      $this.$name=$value;
              }
@@ -2017,63 +2071,63 @@ abstract class CActiveRecord extends CModel
               * @param array $criteria the dynamically specified criteria
               * @param boolean $fromScope whether the criteria to be merged is from scopes
               */
-             public function mergeWith($criteria,$fromScope=false)
+             public void mergeWith(Object criteria, boolean fromScope/*=false*/)
              {
-                 if($criteria instanceof CDbCriteria)
-                     $criteria=$criteria.toArray();
-                 if(isset($criteria["select"]) && $this.select!==$criteria["select"])
+                 if(criteria instanceof CDbCriteria)
+                     criteria = criteria.toArray();
+                 if(isset($criteria["select"]) && this.select != $criteria["select"])
                  {
-                     if($this.select==="*")
-                         $this.select=$criteria["select"];
-                     elseif($criteria["select"]!=="*")
+                     if(this.select == "*")
+                         this.select=$criteria["select"];
+                     else if($criteria["select"] != "*")
                      {
-                         $select1=is_string($this.select)?preg_split("/\s*,\s*/",trim($this.select),-1,PREG_SPLIT_NO_EMPTY):$this.select;
-                         $select2=is_string($criteria["select"])?preg_split("/\s*,\s*/",trim($criteria["select"]),-1,PREG_SPLIT_NO_EMPTY):$criteria["select"];
+                         $select1=is_string($this.select)?preg_split("/\\s*,\\s*/",trim($this.select),-1,PREG_SPLIT_NO_EMPTY):$this.select;
+                         $select2=is_string($criteria["select"])?preg_split("/\\s*,\\s*/",trim($criteria["select"]),-1,PREG_SPLIT_NO_EMPTY):$criteria["select"];
                          $this.select=array_merge($select1,array_diff($select2,$select1));
                      }
                  }
 
-                 if(isset($criteria["condition"]) && $this.condition!==$criteria["condition"])
+                 if(isset($criteria["condition"]) && this.condition != $criteria["condition"])
                  {
-                     if($this.condition==="")
-                         $this.condition=$criteria["condition"];
-                     elseif($criteria["condition"]!=="")
-                         $this.condition="({$this->condition}) AND ({$criteria["condition"]})";
+                     if(this.condition == "")
+                         this.condition = criteria["condition"];
+                     else if($criteria["condition"] != "")
+                         this.condition = "({$this->condition}) AND ({$criteria[\"condition\"]})";
                  }
 
-                 if(isset($criteria["params"]) && $this.params!==$criteria["params"])
-                     $this.params=array_merge($this.params,$criteria["params"]);
+                 if(isset(criteria["params"]) && this.params != criteria["params"])
+                     this.params = array_merge(this.params, criteria["params"]);
 
-                 if(isset($criteria["order"]) && $this.order!==$criteria["order"])
+                 if(isset(criteria["order"]) && this.order != criteria["order"])
                  {
-                     if($this.order==="")
-                         $this.order=$criteria["order"];
-                     elseif($criteria["order"]!=="")
-                         $this.order=$criteria["order"].", ".$this.order;
+                     if (this.order == "")
+                         this.order = criteria["order"];
+                     else if (criteria["order"] != "")
+                         this.order = criteria["order"] + ", " + this.order;
                  }
 
                  if(isset($criteria["group"]) && $this.group!==$criteria["group"])
                  {
-                     if($this.group==="")
-                         $this.group=$criteria["group"];
-                     elseif($criteria["group"]!=="")
-                         $this.group.=", ".$criteria["group"];
+                     if (this.group == "")
+                         this.group = criteria["group"];
+                     else if(criteria["group"] != "")
+                         this.group += ", " + criteria["group"];
                  }
 
-                 if(isset($criteria["join"]) && $this.join!==$criteria["join"])
+                 if(isset(criteria["join"]) && $this.join!==$criteria["join"])
                  {
-                     if($this.join==="")
-                         $this.join=$criteria["join"];
-                     elseif($criteria["join"]!=="")
-                         $this.join.=" ".$criteria["join"];
+                     if (this.join == "")
+                         this.join = $criteria["join"];
+                     else if(criteria["join"] != "")
+                         this.join += " " + criteria["join"];
                  }
 
-                 if(isset($criteria["having"]) && $this.having!==$criteria["having"])
+                 if(isset(criteria["having"]) && $this.having != criteria["having"])
                  {
-                     if($this.having==="")
-                         $this.having=$criteria["having"];
-                     elseif($criteria["having"]!=="")
-                         $this.having="({$this->having}) AND ({$criteria["having"]})";
+                     if (this.having == "")
+                         this.having = criteria["having"];
+                     else if(criteria["having"] != "")
+                         this.having = "({$this->having}) AND ({$criteria[\"having\"]})";
                  }
              }
          }
@@ -2090,26 +2144,26 @@ abstract class CActiveRecord extends CModel
               * @var string the statistical expression. Defaults to 'COUNT(*)', meaning
               * the count of child objects.
               */
-             public $select='COUNT(*)';
+             public String select = "COUNT(*)";
              /**
               * @var mixed the default value to be assigned to those records that do not
               * receive a statistical query result. Defaults to 0.
               */
-             public $defaultValue=0;
+             public Object defaultValue = 0;
 
              /**
               * Merges this relation with a criteria specified dynamically.
               * @param array $criteria the dynamically specified criteria
               * @param boolean $fromScope whether the criteria to be merged is from scopes
               */
-             public function mergeWith($criteria,$fromScope=false)
+             public void mergeWith(Object criteria, boolean fromScope/*=false*/)
              {
-                 if($criteria instanceof CDbCriteria)
-                     $criteria=$criteria.toArray();
-                 parent::mergeWith($criteria,$fromScope);
+                 if(criteria instanceof CDbCriteria)
+                     criteria = criteria.toArray();
+                 super.mergeWith(criteria, fromScope);
 
-                 if(isset($criteria["defaultValue"]))
-                     $this.defaultValue=$criteria["defaultValue"];
+                 if(isset(criteria, "defaultValue"))
+                     this.defaultValue = criteria["defaultValue"];
              }
          }
 
@@ -2125,21 +2179,21 @@ abstract class CActiveRecord extends CModel
              /**
               * @var string join type. Defaults to 'LEFT OUTER JOIN'.
               */
-             public $joinType="LEFT OUTER JOIN";
+             public String joinType = "LEFT OUTER JOIN";
              /**
               * @var string ON clause. The condition specified here will be appended to the joining condition using AND operator.
               */
-             public $on="";
+             public String on = "";
              /**
               * @var string the alias for the table that this relation refers to. Defaults to null, meaning
               * the alias will be the same as the relation name.
               */
-             public $alias;
+             public String alias;
              /**
               * @var string|array specifies which related objects should be eagerly loaded when this related object is lazily loaded.
               * For more details about this property, see {@link CActiveRecord::with()}.
               */
-             public $with=array();
+             public Object with = array();
              /**
               * @var boolean whether this table should be joined with the primary table.
               * When setting this property to be false, the table associated with this relation will
@@ -2149,7 +2203,7 @@ abstract class CActiveRecord extends CModel
               * If this property is not set, the corresponding table will be joined with the primary table
               * only when the primary table is not limited.
               */
-             public $together;
+             public boolean together;
              /**
               * @var mixed scopes to apply
               * Can be set to the one of the following:
@@ -2159,56 +2213,60 @@ abstract class CActiveRecord extends CModel
               * </ul>
               * @since 1.1.9
               */
-              public $scopes;
+              public Object scopes;
              /**
               * @var string the name of the relation that should be used as the bridge to this relation.
               * Defaults to null, meaning don't use any bridge.
               * @since 1.1.7
               */
-             public $through;
+             public String through;
 
              /**
               * Merges this relation with a criteria specified dynamically.
               * @param array $criteria the dynamically specified criteria
               * @param boolean $fromScope whether the criteria to be merged is from scopes
               */
-             public function mergeWith($criteria,$fromScope=false)
+             public void mergeWith(Object criteria,boolean fromScope/*=false*/)
              {
-                 if($criteria instanceof CDbCriteria)
-                     $criteria=$criteria.toArray();
-                 if($fromScope)
+                 if (criteria instanceof CDbCriteria)
+                     criteria = criteria.toArray();
+                 if (fromScope)
                  {
-                     if(isset($criteria["condition"]) && $this.on!==$criteria["condition"])
+                     if (isset(criteria["condition"]) && this.on != criteria["condition"])
                      {
-                         if($this.on==="")
-                             $this.on=$criteria["condition"];
-                         elseif($criteria["condition"]!=="")
-                             $this.on="({$this->on}) AND ({$criteria["condition"]})";
+                         if (this.on == "")
+                             this.on = criteria["condition"];
+                         else if (criteria["condition"] != "")
+                             this.on = "({$this->on}) AND ({$criteria[\"condition\"]})";
                      }
-                     unset($criteria["condition"]);
+                     unset(criteria["condition"]);
                  }
 
-                 parent::mergeWith($criteria);
+                 super.mergeWith(criteria);
 
-                 if(isset($criteria["joinType"]))
-                     $this.joinType=$criteria["joinType"];
+                 if (isset(criteria, "joinType"))
+                     this.joinType = criteria["joinType"];
 
-                 if(isset($criteria["on"]) && $this.on!==$criteria["on"])
+                 if (isset($criteria["on"]) && this.on != criteria["on"])
                  {
-                     if($this.on==="")
-                         $this.on=$criteria["on"];
-                     elseif($criteria["on"]!=="")
-                         $this.on="({$this->on}) AND ({$criteria['on']})";
+                     if (this.on == "")
+                         this.on = criteria["on"];
+                     else if (criteria["on"] != "")
+                         this.on = "({$this->on}) AND ({$criteria['on']})";
                  }
 
-                 if(isset($criteria["with"]))
-                     $this.with=$criteria["with"];
+                 if (isset(criteria["with"]))
+                     this.with = criteria["with"];
 
-                 if(isset($criteria["alias"]))
-                     $this.alias=$criteria["alias"];
+                 if (isset(criteria["alias"]))
+                     this.alias = criteria["alias"];
 
-                 if(isset($criteria["together"]))
-                     $this.together=$criteria["together"];
+                 if (isset(criteria["together"]))
+                     this.together = criteria["together"];
+             }
+             public void mergeWith(Object criteria)
+             {
+                 mergeWith(criteria, false);
              }
          }
 
@@ -2246,35 +2304,35 @@ abstract class CActiveRecord extends CModel
              /**
               * @var integer limit of the rows to be selected. It is effective only for lazy loading this related object. Defaults to -1, meaning no limit.
               */
-             public $limit=-1;
+             public int limit=-1;
              /**
               * @var integer offset of the rows to be selected. It is effective only for lazy loading this related object. Defaults to -1, meaning no offset.
               */
-             public $offset=-1;
+             public int offset=-1;
              /**
               * @var string the name of the column that should be used as the key for storing related objects.
               * Defaults to null, meaning using zero-based integer IDs.
               */
-             public $index;
+             public String index;
 
              /**
               * Merges this relation with a criteria specified dynamically.
               * @param array $criteria the dynamically specified criteria
               * @param boolean $fromScope whether the criteria to be merged is from scopes
               */
-             public function mergeWith($criteria,$fromScope=false)
+             public void mergeWith(Object criteria, boolean fromScope/*=false*/)
              {
-                 if($criteria instanceof CDbCriteria)
-                     $criteria=$criteria.toArray();
-                 parent::mergeWith($criteria,$fromScope);
+                 if (criteria instanceof CDbCriteria)
+                     criteria = criteria.toArray();
+                 super.mergeWith(criteria, fromScope);
                  if(isset($criteria["limit"]) && $criteria["limit"]>0)
-                     $this.limit=$criteria["limit"];
+                     this.limit=$criteria["limit"];
 
                  if(isset($criteria["offset"]) && $criteria["offset"]>=0)
-                     $this.offset=$criteria["offset"];
+                     this.offset=$criteria["offset"];
 
                  if(isset($criteria["index"]))
-                     $this.index=$criteria["index"];
+                     this.index=$criteria["index"];
              }
          }
 
@@ -2290,32 +2348,32 @@ abstract class CActiveRecord extends CModel
              /**
               * @var string name of the junction table for the many-to-many relation.
               */
-             private $_junctionTableName=null;
+             private String _junctionTableName=null;
              /**
               * @var array list of foreign keys of the junction table for the many-to-many relation.
               */
-             private $_junctionForeignKeys=null;
+             private Map _junctionForeignKeys=null;
 
              /**
               * @return string junction table name.
               * @since 1.1.12
               */
-             public function getJunctionTableName()
+             public String getJunctionTableName()
              {
-                 if ($this._junctionTableName===null)
-                     $this.initJunctionData();
-                 return $this._junctionTableName;
+                 if (this._junctionTableName == null)
+                     this.initJunctionData();
+                 return this._junctionTableName;
              }
 
              /**
               * @return array list of junction table foreign keys.
               * @since 1.1.12
               */
-             public function getJunctionForeignKeys()
+             public Map getJunctionForeignKeys()
              {
-                 if ($this._junctionForeignKeys===null)
-                     $this.initJunctionData();
-                 return $this._junctionForeignKeys;
+                 if (this._junctionForeignKeys == null)
+                     this.initJunctionData();
+                 return this._junctionForeignKeys;
              }
 
              /**
@@ -2323,13 +2381,16 @@ abstract class CActiveRecord extends CModel
               * {@link foreignKey} value.
               * @throws CDbException if {@link foreignKey} has been specified in wrong format.
               */
-             private function initJunctionData()
+             private void initJunctionData()
              {
-                 if(!preg_match("/^\s*(.*?)\((.*)\)\s*$/",$this.foreignKey,$matches))
-                     throw new CDbException(Yii::t("yii","The relation "{relation}" in active record class "{class}" is specified with an invalid foreign key. The format of the foreign key must be "joinTable(fk1,fk2,...)".",
-                         array("{class}"=>$this.className,"{relation}"=>$this.name)));
-                 $this._junctionTableName=$matches[1];
-                 $this._junctionForeignKeys=preg_split("/\s*,\s*/",$matches[2],-1,PREG_SPLIT_NO_EMPTY);
+                 if(!preg_match("/^\\s*(.*?)\\((.*)\\)\\s*$/",$this.foreignKey,$matches))
+                     throw new CDbException(Yii.t("yii",
+                             "The relation \"{relation}\" in active record class \"{class}\" is specified"
+                             + " with an invalid foreign key. The format of the foreign key must be "
+                             + "\"joinTable(fk1,fk2,...)\".",
+                             array("{class}", $this.className, "{relation}", $this.name)));
+                 this._junctionTableName=$matches[1];
+                 this._junctionForeignKeys=preg_split("/\\s*,\\s*/",$matches[2],-1,PREG_SPLIT_NO_EMPTY);
              }
          }
 
@@ -2346,28 +2407,28 @@ abstract class CActiveRecord extends CModel
              /**
               * @var CDbTableSchema the table schema information
               */
-             public $tableSchema;
+             public CDbTableSchema tableSchema;
              /**
               * @var array table columns
               */
-             public $columns;
+             public Map<String, Object> columns;
              /**
               * @var array list of relations
               */
-             public $relations=array();
+             public Map<String, Object> relations=array();
              /**
               * @var array attribute default values
               */
-             public $attributeDefaults=array();
+             public Map<String, Object> attributeDefaults=array();
 
-             private $_modelClassName;
+             private String _modelClassName;
 
              /**
               * Constructor.
               * @param CActiveRecord $model the model instance
               * @throws CDbException if specified table for active record class cannot be found in the database
               */
-             public function __construct($model)
+             public CActiveRecordMetaData (CActiveRecord model)
              {
                  $this._modelClassName=get_class($model);
 
@@ -2416,12 +2477,13 @@ abstract class CActiveRecord extends CModel
               * @return void
               * @since 1.1.2
               */
-             public function addRelation($name,$config)
+             public void addRelation(String name, Map<String, Object> config)
              {
-                 if(isset($config[0],$config[1],$config[2]))  // relation class, AR class, FK
-                     $this.relations[$name]=new $config[0]($name,$config[1],$config[2],array_slice($config,3));
+                 if(isset(config[0], config[1], config[2]))  // relation class, AR class, FK
+                     this.relations[name] = new config[0](name, config[1], config[2], array_slice(config,3));
                  else
-                     throw new CDbException(Yii::t("yii","Active record "{class}" has an invalid configuration for relation "{relation}". It must specify the relation type, the related active record class and the foreign key.", array("{class}"=>$this._modelClassName,"{relation}"=>$name)));
+                     throw new CDbException(Yii.t("yii","Active record \"{class}\" has an invalid configuration for relation "{relation}". It must specify the relation type, the related active record class and the foreign key.",
+                             array("{class}", this._modelClassName, "{relation}", name)));
              }
 
              /**
@@ -2431,9 +2493,9 @@ abstract class CActiveRecord extends CModel
               * @return boolean
               * @since 1.1.2
               */
-             public function hasRelation($name)
+             public boolean hasRelation(String name)
              {
-                 return isset($this.relations[$name]);
+                 return isset(this.relations[name]);
              }
 
              /**
@@ -2443,8 +2505,8 @@ abstract class CActiveRecord extends CModel
               * @return void
               * @since 1.1.2
               */
-             public function removeRelation($name)
+             public void removeRelation(String name)
              {
-                 unset($this.relations[$name]);
+                 unset(this.relations[name]);
              }
          }

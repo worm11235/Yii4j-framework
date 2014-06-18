@@ -8,7 +8,14 @@
  */
 package net.geecode.framework.db.schema;
 
+import static net.geecode.php.base.Global.*;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import net.geecode.framework.base.CComponent;
 
@@ -28,7 +35,7 @@ import net.geecode.framework.base.CComponent;
  * @package system.db.schema
  * @since 1.0
  */
-class CDbCriteria extends CComponent
+public class CDbCriteria extends CComponent
 {
     public static final String PARAM_PREFIX = ":ycp";
     /**
@@ -101,7 +108,7 @@ class CDbCriteria extends CComponent
      * to perform the eager loading. Please refer to {@link CActiveRecord::with()} on how to specify this parameter.
      * @since 1.1.0
      */
-    public $with;
+    public Object with;
     /**
      * @var string the alias name of the table. If not set, it means the alias is 't'.
      */
@@ -122,13 +129,13 @@ class CDbCriteria extends CComponent
      *
      * @since 1.1.4
      */
-    public $together;
+    public boolean together;
     /**
      * @var string the name of the AR attribute whose value should be used as index of the query result array.
      * Defaults to null, meaning the result array will be zero-based integers.
      * @since 1.1.5
      */
-    public $index;
+    public String index;
     /**
      * @var mixed scopes to apply
      *
@@ -154,59 +161,117 @@ class CDbCriteria extends CComponent
      * </ul>
      * @since 1.1.7
      */
-    public $scopes;
+    public Object scopes;
 
     /**
      * Constructor.
      * @param array $data criteria initial property values (indexed by property name)
      */
-    public function __construct($data=array())
+    public CDbCriteria(Map<String, Object> data/*=array()*/)
     {
-        foreach($data as $name=>$value)
-            $this->$name=$value;
+        for(Entry<String, Object> ent : data.entrySet()/* as $name=>$value*/)
+        {
+            String name = ent.getKey();
+            Object value = ent.getValue();
+            Field f;
+            try
+            {
+                f = this.getClass().getField(name);
+                if (null != f)
+                    f.set(this, value);
+            } catch (NoSuchFieldException | SecurityException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            //            this.$name=$value;
+            catch (IllegalArgumentException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IllegalAccessException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
      * Remaps criteria parameters on unserialize to prevent name collisions.
      * @since 1.1.9
      */
-    public function __wakeup()
+    public void __wakeup()
     {
-        $map=array();
-        $params=array();
-        foreach($this->params as $name=>$value)
+        Map<String, Object> map = array();
+        params=array();
+        for(Entry<String, Object> ent : this.params.entrySet()/* as $name=>$value*/)
         {
-            if(strpos($name,self::PARAM_PREFIX)===0)
+            String name = ent.getKey();
+            Object value = ent.getValue();
+            String newName = null;
+            if(strpos(name, PARAM_PREFIX) == 0)
             {
-                $newName=self::PARAM_PREFIX.self::$paramCount++;
-                $map[$name]=$newName;
+                newName = PARAM_PREFIX + paramCount++;
+                map.put(name, newName);
             }
             else
             {
-                $newName=$name;
+                newName = name;
             }
-            $params[$newName]=$value;
+            params.put(newName, value);
         }
-        if (!empty($map))
+        if (!(map.isEmpty()))
         {
-            $sqlContentFieldNames=array(
-                'select',
-                'condition',
-                'order',
-                'group',
-                'join',
-                'having',
+            List<String> sqlContentFieldNames = Arrays.asList(
+                "select",
+                "condition",
+                "order",
+                "group",
+                "join",
+                "having"
             );
-            foreach($sqlContentFieldNames as $field)
+            for (String field : sqlContentFieldNames/* as $field*/)
             {
-                if(is_array($this->$field))
-                    foreach($this->$field as $k=>$v)
-                        $this->{$field}[$k]=strtr($v,$map);
-                else
-                    $this->$field=strtr($this->$field,$map);
+                Field f;
+                try
+                {
+                    f = this.getClass().getField(field);
+                    if (null == f)
+                        continue;
+                    Object fv = f.get(this);
+                    if(is_array(fv))
+                    {
+                        Map mp = (Map) fv;
+                        for(Object ent : (mp.entrySet())/* as $k=>$v*/)
+                        {
+                            
+                            Object k = ((Entry)ent).getKey();
+                            Object v = ((Entry)ent).getValue();
+                            mp.put(k, strtr((String)v, map));
+                        }
+                    }
+                    else
+                    {
+                        f.set(this, strtr((String)fv, map));
+//                    this.$field=strtr(this.$field,$map);
+                    }
+                } catch (NoSuchFieldException | SecurityException e)
+                {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } catch (IllegalArgumentException e)
+                {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } catch (IllegalAccessException e)
+                {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
             }
         }
-        $this->params=$params;
+        this.params = params;
     }
 
     /**
@@ -221,19 +286,19 @@ class CDbCriteria extends CComponent
      * @param string $operator the operator to join different conditions. Defaults to 'AND'.
      * @return CDbCriteria the criteria object itself
      */
-    public function addCondition($condition,$operator='AND')
+    public CDbCriteria addCondition(Object condition, String operator/*="AND"*/)
     {
-        if(is_array($condition))
+        if(is_array(condition))
         {
-            if($condition===array())
-                return $this;
-            $condition='('.implode(') '.$operator.' (',$condition).')';
+            if(condition == array())
+                return this;
+            condition="(" + implode(") "+operator+" (",(Object[])condition)+")";
         }
-        if($this->condition==='')
-            $this->condition=$condition;
+        if(this.condition=="")
+            this.condition=(String) condition;
         else
-            $this->condition='('.$this->condition.') '.$operator.' ('.$condition.')';
-        return $this;
+            this.condition="("+this.condition+") "+operator+" ("+condition+")";
+        return this;
     }
 
     /**
@@ -254,15 +319,17 @@ class CDbCriteria extends CComponent
      * @param string $like the LIKE operator. Defaults to 'LIKE'. You may also set this to be 'NOT LIKE'.
      * @return CDbCriteria the criteria object itself
      */
-    public function addSearchCondition($column,$keyword,$escape=true,$operator='AND',$like='LIKE')
+    public CDbCriteria addSearchCondition(String column, String keyword,
+            boolean escape/*=true*/, String operator/*="AND"*/, String like/*="LIKE"*/)
     {
-        if($keyword=='')
-            return $this;
-        if($escape)
-            $keyword='%'.strtr($keyword,array('%'=>'\%', '_'=>'\_', '\\'=>'\\\\')).'%';
-        $condition=$column." $like ".self::PARAM_PREFIX.self::$paramCount;
-        $this->params[self::PARAM_PREFIX.self::$paramCount++]=$keyword;
-        return $this->addCondition($condition, $operator);
+        if(keyword=="")
+            return this;
+        if(escape)
+            keyword = "%"
+                    + strtr(keyword, array("%", "\\%", "_", "\\_", "\\", "\\\\")) + "%";
+        condition = column + " $like " + PARAM_PREFIX + paramCount;
+        this.params.put(PARAM_PREFIX + paramCount++, keyword);
+        return this.addCondition(condition, operator);
     }
 
     /**
@@ -277,32 +344,33 @@ class CDbCriteria extends CComponent
      * Defaults to 'AND'.
      * @return CDbCriteria the criteria object itself
      */
-    public function addInCondition($column,$values,$operator='AND')
+    public CDbCriteria addInCondition(String column, List<String> values, String operator/*="AND"*/)
     {
-        if(($n=count($values))<1)
-            $condition='0=1'; // 0=1 is used because in MSSQL value alone can't be used in WHERE
-        elseif($n===1)
+        int n = values.size();
+        if(n < 1)
+            condition = "0=1"; // 0=1 is used because in MSSQL value alone can't be used in WHERE
+        else if(n == 1)
         {
-            $value=reset($values);
-            if($value===null)
-                $condition=$column.' IS NULL';
+            Object value = values.get(0)/*reset(values)*/;
+            if (value == null)
+                condition = column + " IS NULL";
             else
             {
-                $condition=$column.'='.self::PARAM_PREFIX.self::$paramCount;
-                $this->params[self::PARAM_PREFIX.self::$paramCount++]=$value;
+                condition = column + "=" + PARAM_PREFIX + paramCount;
+                this.params.put(PARAM_PREFIX + paramCount++, value);
             }
         }
         else
         {
-            $params=array();
-            foreach($values as $value)
+            List<String> lparams = new ArrayList<String>();
+            for (String value : values)
             {
-                $params[]=self::PARAM_PREFIX.self::$paramCount;
-                $this->params[self::PARAM_PREFIX.self::$paramCount++]=$value;
+                lparams.add(PARAM_PREFIX + paramCount);
+                this.params.put(PARAM_PREFIX + paramCount++, value);
             }
-            $condition=$column.' IN ('.implode(', ',$params).')';
+            condition = column + " IN (" + implode(", ", lparams)+")";
         }
-        return $this->addCondition($condition,$operator);
+        return this.addCondition(condition, operator);
     }
 
     /**
@@ -318,32 +386,34 @@ class CDbCriteria extends CComponent
      * @return CDbCriteria the criteria object itself
      * @since 1.1.1
      */
-    public function addNotInCondition($column,$values,$operator='AND')
+    public CDbCriteria addNotInCondition(String column, List<String> values,
+            String operator/*="AND"*/)
     {
-        if(($n=count($values))<1)
-            return $this;
-        if($n===1)
+        int n = values.size();
+        if(n < 1)
+            return this;
+        if(n == 1)
         {
-            $value=reset($values);
-            if($value===null)
-                $condition=$column.' IS NOT NULL';
+            Object value = values.get(0)/*reset(values)*/;
+            if(value == null)
+                condition= column+" IS NOT NULL";
             else
             {
-                $condition=$column.'!='.self::PARAM_PREFIX.self::$paramCount;
-                $this->params[self::PARAM_PREFIX.self::$paramCount++]=$value;
+                condition = column + "!=" + PARAM_PREFIX + paramCount;
+                this.params.put(PARAM_PREFIX + paramCount++, value);
             }
         }
         else
         {
-            $params=array();
-            foreach($values as $value)
+            List<String> lparams = new ArrayList<String>();
+            for (String value : values/* as $value*/)
             {
-                $params[]=self::PARAM_PREFIX.self::$paramCount;
-                $this->params[self::PARAM_PREFIX.self::$paramCount++]=$value;
+                lparams.add(PARAM_PREFIX + paramCount);
+                this.params.put(PARAM_PREFIX + paramCount++, value);
             }
-            $condition=$column.' NOT IN ('.implode(', ',$params).')';
+            condition = column + " NOT IN (" + implode(", ", lparams) + ")";
         }
-        return $this->addCondition($condition,$operator);
+        return this.addCondition (condition, operator);
     }
 
     /**
@@ -357,20 +427,23 @@ class CDbCriteria extends CComponent
      * Defaults to 'AND'.
      * @return CDbCriteria the criteria object itself
      */
-    public function addColumnCondition($columns,$columnOperator='AND',$operator='AND')
+    public CDbCriteria addColumnCondition(Map<String, Object> columns,
+            String columnOperator/*="AND"*/, String operator/*="AND"*/)
     {
-        $params=array();
-        foreach($columns as $name=>$value)
+        List<String> lparams = new ArrayList<String>();
+        for (Entry<String, Object> et : columns.entrySet()/* as name=>value*/)
         {
-            if($value===null)
-                $params[]=$name.' IS NULL';
+            String name = et.getKey();
+            Object value = et.getValue();
+            if (value == null)
+                lparams.add(name+" IS NULL");
             else
             {
-                $params[]=$name.'='.self::PARAM_PREFIX.self::$paramCount;
-                $this->params[self::PARAM_PREFIX.self::$paramCount++]=$value;
+                lparams.add(name + "=" + PARAM_PREFIX + paramCount);
+                this.params.put(PARAM_PREFIX + paramCount++, value);
             }
         }
-        return $this->addCondition(implode(" $columnOperator ",$params), $operator);
+        return this.addCondition(implode(" $columnOperator ", params), operator);
     }
 
     /**
@@ -407,7 +480,7 @@ class CDbCriteria extends CComponent
      * @param boolean $partialMatch whether the value should consider partial text match (using LIKE and NOT LIKE operators).
      * Defaults to false, meaning exact comparison.
      * @param string $operator the operator used to concatenate the new condition with the existing one.
-     * Defaults to 'AND'.
+     * Defaults to "AND'.
      * @param boolean $escape whether the value should be escaped if $partialMatch is true and
      * the value contains characters % or _. When this parameter is true (default),
      * the special characters % (matches 0 or more characters)
@@ -417,42 +490,47 @@ class CDbCriteria extends CComponent
      * @return CDbCriteria the criteria object itself
      * @since 1.1.1
      */
-    public function compare($column, $value, $partialMatch=false, $operator='AND', $escape=true)
+    public CDbCriteria compare(String column, Object value, boolean partialMatch/*=false*/,
+            String operator/*="AND"*/, boolean escape/*=true*/)
     {
-        if(is_array($value))
+        if(is_array(value))
         {
-            if($value===array())
-                return $this;
-            return $this->addInCondition($column,$value,$operator);
+            if(((List)value).isEmpty())
+                return this;
+            return this.addInCondition(column, (List<String>) value, operator);
         }
         else
-            $value="$value";
+            value="$value";
 
-        if(preg_match('/^(?:\s*(<>|<=|>=|<|>|=))?(.*)$/',$value,$matches))
+        List<String> matches = new ArrayList<String>();
+        String op = null;
+        if(preg_match("/^(?:\\s*(<>|<=|>=|<|>|=))?(.*)$/", value, matches))
         {
-            $value=$matches[2];
-            $op=$matches[1];
+            value = matches.get(2);
+            op = matches.get(1);
         }
         else
-            $op='';
+            op = "";
 
-        if($value==='')
-            return $this;
+        if (value == "")
+            return this;
 
-        if($partialMatch)
+        if (partialMatch)
         {
-            if($op==='')
-                return $this->addSearchCondition($column,$value,$escape,$operator);
-            if($op==='<>')
-                return $this->addSearchCondition($column,$value,$escape,$operator,'NOT LIKE');
+            if (op == "")
+                return this.addSearchCondition (column, (String) value,
+                        escape, operator, "LIKE");
+            if(op=="<>")
+                return this.addSearchCondition (column, (String) value, escape,
+                        operator, "NOT LIKE");
         }
-        elseif($op==='')
-            $op='=';
+        else if (op == "")
+            op = "=";
 
-        $this->addCondition($column.$op.self::PARAM_PREFIX.self::$paramCount,$operator);
-        $this->params[self::PARAM_PREFIX.self::$paramCount++]=$value;
+        this.addCondition(column + op + PARAM_PREFIX + paramCount, operator);
+        this.params.put(PARAM_PREFIX + paramCount++, value);
 
-        return $this;
+        return this;
     }
 
     /**
@@ -471,18 +549,19 @@ class CDbCriteria extends CComponent
      * @return CDbCriteria the criteria object itself
      * @since 1.1.2
      */
-    public function addBetweenCondition($column,$valueStart,$valueEnd,$operator='AND')
+    public CDbCriteria addBetweenCondition(String column, String valueStart, String valueEnd,
+            String operator/*="AND"*/)
     {
-        if($valueStart==='' || $valueEnd==='')
-            return $this;
+        if(valueStart == "" || valueEnd == "")
+            return this;
 
-        $paramStart=self::PARAM_PREFIX.self::$paramCount++;
-        $paramEnd=self::PARAM_PREFIX.self::$paramCount++;
-        $this->params[$paramStart]=$valueStart;
-        $this->params[$paramEnd]=$valueEnd;
-        $condition="$column BETWEEN $paramStart AND $paramEnd";
+        String paramStart = PARAM_PREFIX + paramCount++;
+        String paramEnd = PARAM_PREFIX + paramCount++;
+        this.params.put(paramStart, valueStart)/*[paramStart]=valueStart*/;
+        this.params.put(paramEnd, valueEnd)/*[paramEnd]=valueEnd*/;
+        condition="$column BETWEEN $paramStart AND $paramEnd";
 
-        return $this->addCondition($condition,$operator);
+        return this.addCondition(condition, operator);
     }
 
     /**
@@ -491,160 +570,207 @@ class CDbCriteria extends CComponent
      * For example, if both criterias have conditions, they will be 'AND' together.
      * Also, the criteria passed as the parameter takes precedence in case
      * two options cannot be merged (e.g. LIMIT, OFFSET).
-     * @param mixed $criteria the criteria to be merged with. Either an array or CDbCriteria.
-     * @param string|boolean $operator the operator used to concatenate where and having conditions. Defaults to 'AND'.
+     * @param mixed $criteria the criteria to be merged with. Either an array or
+     *  CDbCriteria.
+     * @param string|boolean $operator the operator used to concatenate where and
+     *  having conditions. Defaults to 'AND'.
      * For backwards compatibility a boolean value can be passed:
      * - 'false' for 'OR'
      * - 'true' for 'AND'
      */
-    public function mergeWith($criteria,$operator='AND')
+    public void mergeWith(CDbCriteria criteria, String operator/*="AND"*/)
     {
-        if(is_bool($operator))
-            $operator=$operator ? 'AND' : 'OR';
-        if(is_array($criteria))
-            $criteria=new self($criteria);
-        if($this->select!==$criteria->select)
+        if(this.select != criteria.select)
         {
-            if($this->select==='*')
-                $this->select=$criteria->select;
-            elseif($criteria->select!=='*')
+            if(this.select=="*")
+                this.select=criteria.select;
+            else if(criteria.select!="*")
             {
-                $select1=is_string($this->select)?preg_split('/\s*,\s*/',trim($this->select),-1,PREG_SPLIT_NO_EMPTY):$this->select;
-                $select2=is_string($criteria->select)?preg_split('/\s*,\s*/',trim($criteria->select),-1,PREG_SPLIT_NO_EMPTY):$criteria->select;
-                $this->select=array_merge($select1,array_diff($select2,$select1));
+                String select1 = is_string(this.select) ?
+                        preg_split("/\\s*,\\s*/", trim(this.select), -1, 
+                                PREG_SPLIT_NO_EMPTY) : 
+                                    this.select;
+                String select2 = is_string(criteria.select) ?
+                        preg_split("/\\s*,\\s*/", trim(criteria.select),
+                                -1, PREG_SPLIT_NO_EMPTY) : criteria.select;
+                this.select = array_merge(select1, array_diff(select2, select1));
             }
         }
 
-        if($this->condition!==$criteria->condition)
+        if (this.condition != criteria.condition)
         {
-            if($this->condition==='')
-                $this->condition=$criteria->condition;
-            elseif($criteria->condition!=='')
-                $this->condition="({$this->condition}) $operator ({$criteria->condition})";
+            if (this.condition == "")
+                this.condition = criteria.condition;
+            else if (criteria.condition != "")
+                this.condition
+                        = "({$this->condition}) $operator ({$criteria->condition})";
         }
 
-        if($this->params!==$criteria->params)
-            $this->params=array_merge($this->params,$criteria->params);
+        if (!this.params.equals(criteria.params))
+            this.params = array_merge(this.params, criteria.params);
 
-        if($criteria->limit>0)
-            $this->limit=$criteria->limit;
+        if (criteria.limit > 0)
+            this.limit = criteria.limit;
 
-        if($criteria->offset>=0)
-            $this->offset=$criteria->offset;
+        if (criteria.offset >= 0)
+            this.offset = criteria.offset;
 
-        if($criteria->alias!==null)
-            $this->alias=$criteria->alias;
+        if (criteria.alias != null)
+            this.alias = criteria.alias;
 
-        if($this->order!==$criteria->order)
+        if(this.order != criteria.order)
         {
-            if($this->order==='')
-                $this->order=$criteria->order;
-            elseif($criteria->order!=='')
-                $this->order=$criteria->order.', '.$this->order;
+            if (this.order == "")
+                this.order = criteria.order;
+            else if (criteria.order != "")
+                this.order = criteria.order + ", " + this.order;
         }
 
-        if($this->group!==$criteria->group)
+        if (this.group != criteria.group)
         {
-            if($this->group==='')
-                $this->group=$criteria->group;
-            elseif($criteria->group!=='')
-                $this->group.=', '.$criteria->group;
+            if (this.group == "")
+                this.group = criteria.group;
+            else if (criteria.group != "")
+                this.group+=", "+criteria.group;
         }
 
-        if($this->join!==$criteria->join)
+        if (this.join != criteria.join)
         {
-            if($this->join==='')
-                $this->join=$criteria->join;
-            elseif($criteria->join!=='')
-                $this->join.=' '.$criteria->join;
+            if (this.join == "")
+                this.join = criteria.join;
+            else if (criteria.join != "")
+                this.join += " " + criteria.join;
         }
 
-        if($this->having!==$criteria->having)
+        if (this.having != criteria.having)
         {
-            if($this->having==='')
-                $this->having=$criteria->having;
-            elseif($criteria->having!=='')
-                $this->having="({$this->having}) $operator ({$criteria->having})";
+            if (this.having == "")
+                this.having=criteria.having;
+            else if(criteria.having!="")
+                this.having="({$this->having}) $operator ({$criteria->having})";
         }
 
-        if($criteria->distinct>0)
-            $this->distinct=$criteria->distinct;
+        if(criteria.distinct/*>0*/)
+            this.distinct = criteria.distinct;
 
-        if($criteria->together!==null)
-            $this->together=$criteria->together;
+        if(criteria.together/*!=null*/)
+            this.together = criteria.together;
 
-        if($criteria->index!==null)
-            $this->index=$criteria->index;
+        if(criteria.index!=null)
+            this.index=criteria.index;
 
-        if(empty($this->scopes))
-            $this->scopes=$criteria->scopes;
-        elseif(!empty($criteria->scopes))
+        if(null == (this.scopes))
+            this.scopes=criteria.scopes;
+        else if(null != /*empty*/(criteria.scopes))
         {
-            $scopes1=(array)$this->scopes;
-            $scopes2=(array)$criteria->scopes;
-            foreach($scopes1 as $k=>$v)
+            Map<String, Object> scopes1 = (Map<String, Object>)this.scopes;
+            Map<String, Object> scopes2=(Map<String, Object>)criteria.scopes;
+            for(Entry<String, Object> ent : scopes1.entrySet()/* as $k=>$v*/)
             {
-                if(is_integer($k))
+                String k = ent.getKey();
+                Object v = ent.getValue();
+                /*if(is_integer(k))
+                    scopes[]=$v;
+                else */if(isset(scopes2, k))
+                    scopes[] = array(k, v);
+                else
+                    scopes[$k]=$v;
+            }
+            for(Entry<String, Object> ent : scopes2.entrySet()/* as $k=>$v*/)
+            {
+                /*if(is_integer($k))
                     $scopes[]=$v;
-                elseif(isset($scopes2[$k]))
+                else*/if(isset($scopes1[$k]))
                     $scopes[]=array($k=>$v);
                 else
                     $scopes[$k]=$v;
             }
-            foreach($scopes2 as $k=>$v)
-            {
-                if(is_integer($k))
-                    $scopes[]=$v;
-                elseif(isset($scopes1[$k]))
-                    $scopes[]=array($k=>$v);
-                else
-                    $scopes[$k]=$v;
-            }
-            $this->scopes=$scopes;
+            $this.scopes=$scopes;
         }
 
-        if(empty($this->with))
-            $this->with=$criteria->with;
-        elseif(!empty($criteria->with))
+        if(null == (this.with))
+            this.with = criteria.with;
+        else if(null !=/*empty*/(criteria.with))
         {
-            $this->with=(array)$this->with;
-            foreach((array)$criteria->with as $k=>$v)
+            this.with = /*(array)*/this.with;
+            for (Entry<String, Object> ent :
+                ((Map<String, Object>)criteria.with).entrySet()/* as $k=>$v*/)
             {
-                if(is_integer($k))
-                    $this->with[]=$v;
-                elseif(isset($this->with[$k]))
+                String k = ent.getKey();
+                Object v = ent.getValue();
+                /*if(is_integer($k))
+                    $this.with[]=$v;
+                else*/if(isset((Map)this.with, k))
                 {
-                    $excludes=array();
-                    foreach(array('joinType','on') as $opt)
+                    Map<String, Object> excludes = array();
+                    for(String opt : Arrays.asList("joinType","on")/* as $opt*/)
                     {
-                        if(isset($this->with[$k][$opt]))
-                            $excludes[$opt]=$this->with[$k][$opt];
+                        if(isset((Map)this.with, k) && isset((Map)((Map)this.with).get(k),opt))
+                            excludes[$opt]=$this.with[$k][$opt];
                         if(isset($v[$opt]))
-                            $excludes[$opt]= ($opt==='on' && isset($excludes[$opt]) && $v[$opt]!==$excludes[$opt]) ?
+                            $excludes[$opt]= ($opt==="on" && isset($excludes[$opt]) && $v[$opt]!==$excludes[$opt]) ?
                                 "($excludes[$opt]) AND $v[$opt]" : $v[$opt];
-                        unset($this->with[$k][$opt]);
+                        unset($this.with[$k][$opt]);
                         unset($v[$opt]);
                     }
-                    $this->with[$k]=new self($this->with[$k]);
-                    $this->with[$k]->mergeWith($v,$operator);
-                    $this->with[$k]=$this->with[$k]->toArray();
+                    $this.with[$k]=new self($this.with[$k]);
+                    $this.with[$k].mergeWith($v,$operator);
+                    $this.with[$k]=$this.with[$k].toArray();
                     if (count($excludes)!==0)
-                        $this->with[$k]=CMap::mergeArray($this->with[$k],$excludes);
+                        $this.with[$k]=CMap::mergeArray($this.with[$k],$excludes);
                 }
                 else
-                    $this->with[$k]=$v;
+                    this.with[k]=v;
             }
         }
+    }
+    public void mergeWith(CDbCriteria criteria)
+    {
+        mergeWith(criteria, "AND");
+    }
+    
+    public void mergeWith(CDbCriteria criteria, boolean operator/*="AND"*/)
+    {
+        mergeWith(criteria, operator ? "AND" : "OR");
+    }
+    
+    public void mergeWith(Map criteria, boolean operator/*="AND"*/)
+    {
+        mergeWith(new CDbCriteria(criteria), operator ? "AND" : "OR");
     }
 
     /**
      * @return array the array representation of the criteria
      */
-    public function toArray()
+    public Map<String, Object> toArray()
     {
-        $result=array();
-        foreach(array('select', 'condition', 'params', 'limit', 'offset', 'order', 'group', 'join', 'having', 'distinct', 'scopes', 'with', 'alias', 'index', 'together') as $name)
-            $result[$name]=$this->$name;
-        return $result;
+        Map<String, Object> result=array();
+        for (String name : Arrays.asList("select", "condition", "params", "limit",
+                "offset", "order", "group", "join", "having", "distinct", "scopes",
+                "with", "alias", "index", "together")/* as $name*/)
+        {
+            Field f;
+            try
+            {
+                f = this.getClass().getField(name);
+                if (null != f)
+                {
+                    result.put(name, f.get(this));
+                }
+            } catch (NoSuchFieldException | SecurityException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IllegalArgumentException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IllegalAccessException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        return result;
     }
 }

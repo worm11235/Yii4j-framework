@@ -7,6 +7,7 @@ import java.io.File;
 import java.util.Map;
 
 import net.geecode.framework.base.CException;
+import net.geecode.framework.i18n.CLocale;
 import net.geecode.framework.lite.CEvent;
 import net.geecode.framework.lite.CModule;
 import net.geecode.framework.lite.Yii;
@@ -189,13 +190,17 @@ public abstract class CApplication extends CModule
     {
         return CLocale.getInstance($localeID==null?this.getLanguage():$localeID);
     }
+    public CLocale getLocale()
+    {
+        return getLocale(null);
+    }
     public String getLocaleDataPath()
     {
-        return CLocale.$dataPath==null ? Yii.getPathOfAlias("system.i18n.data") : CLocale.$dataPath;
+        return CLocale.dataPath==null ? Yii.getPathOfAlias("system.i18n.data") : CLocale.dataPath;
     }
     public void setLocaleDataPath(String $value)
     {
-        CLocale.$dataPath=$value;
+        CLocale.dataPath=$value;
     }
     public String getNumberFormatter()
     {
