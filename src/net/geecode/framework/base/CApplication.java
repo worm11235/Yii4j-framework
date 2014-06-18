@@ -204,11 +204,11 @@ public abstract class CApplication extends CModule
     }
     public String getNumberFormatter()
     {
-        return this.getLocale().getNumberFormatter();
+        return this.getLocale(null).getNumberFormatter();
     }
     public Object getDateFormatter()
     {
-        return this.getLocale().getDateFormatter();
+        return this.getLocale(null).getDateFormatter();
     }
     public Object getDb()
     {

@@ -11,11 +11,14 @@ package net.geecode.framework.lite;
 
 import static net.geecode.php.base.Global.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import net.geecode.framework.base.CComponent;
+import net.geecode.framework.base.CException;
+import net.geecode.framework.lite.CHttpRequest.CBaseActiveRelation.CStatRelation.CActiveRelation.CDbColumnSchema.CSqliteColumnSchema.CValidator;
 import net.geecode.framework.lite.CHttpRequest.CClientScript.CList;
 
 /**
@@ -38,7 +41,7 @@ import net.geecode.framework.lite.CHttpRequest.CClientScript.CList;
 public abstract class CModel extends CComponent/* implements IteratorAggregate, ArrayAccess*/
 {
     private Map<String, Object> _errors = array();   // attribute name => array of errors
-    private Object _validators;       // validators
+    private List _validators;       // validators
     private String _scenario = "";      // scenario
 
     /**
@@ -158,10 +161,10 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
      * @see beforeValidate
      * @see afterValidate
      */
-    public boolean validate(List attributes/*=null*/, boolean clearErrors/*=true*/)
+    public boolean validate(Map attributes/*=null*/, boolean clearErrors/*=true*/)
     {
         if (clearErrors)
-            this.clearErrors();
+            this.clearErrors(null);
         if (this.beforeValidate())
         {
             for (this.getValidators() as $validator)
@@ -193,11 +196,11 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
      * @return boolean whether validation should be executed. Defaults to true.
      * If false is returned, the validation will stop and the model is considered invalid.
      */
-    protected function beforeValidate()
+    protected boolean beforeValidate()
     {
-        $event=new CModelEvent($this);
-        $this->onBeforeValidate($event);
-        return $event->isValid;
+        CModelEvent event=new CModelEvent(this);
+        this.onBeforeValidate(event);
+        return event.isValid;
     }
 
     /**
@@ -206,9 +209,9 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
      * You may override this method to do postprocessing after validation.
      * Make sure the parent implementation is invoked so that the event can be raised.
      */
-    protected function afterValidate()
+    protected void afterValidate()
     {
-        $this->onAfterValidate(new CEvent($this));
+        this.onAfterValidate(new CEvent(this));
     }
 
     /**
@@ -224,18 +227,18 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
      * This event is raised before the validation is performed.
      * @param CModelEvent $event the event parameter
      */
-    public function onBeforeValidate($event)
+    public void onBeforeValidate(CEvent event)
     {
-        $this->raiseEvent("onBeforeValidate",$event);
+        this.raiseEvent("onBeforeValidate", event);
     }
 
     /**
      * This event is raised after the validation is performed.
      * @param CEvent $event the event parameter
      */
-    public function onAfterValidate($event)
+    public void onAfterValidate(CEvent event)
     {
-        $this->raiseEvent("onAfterValidate",$event);
+        this.raiseEvent("onAfterValidate", event);
     }
 
     /**
@@ -250,11 +253,11 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
      * @return CList all the validators declared in the model.
      * @since 1.1.2
      */
-    public function getValidatorList()
+    public List getValidatorList()
     {
-        if($this->_validators===null)
-            $this->_validators=$this->createValidators();
-        return $this->_validators;
+        if(this._validators == null)
+            this._validators = this.createValidators();
+        return this._validators;
     }
 
     /**
@@ -269,12 +272,12 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
             this._validators = this.createValidators();
 
         validators = array();
-        scenario = this.getScenario();
-        foreach($this->_validators as $validator)
+        String scenario = this.getScenario();
+        for(Object validator : this._validators/* as $validator*/)
         {
-            if($validator->applyTo($scenario))
+            if (validator.applyTo(scenario))
             {
-                if($attribute===null || in_array($attribute,$validator->attributes,true))
+                if(attribute == null || in_array($attribute,$validator->attributes,true))
                     $validators[]=$validator;
             }
         }
@@ -292,11 +295,11 @@ public abstract class CModel extends CComponent/* implements IteratorAggregate, 
         List validators = new ArrayList();
         for(Object rule : this.rules()/* as $rule*/)
         {
-            if(isset($rule[0],$rule[1]))  // attributes, validator name
+            if(isset(rule[0], rule[1]))  // attributes, validator name
                 validators.add(CValidator.createValidator($rule[1],$this,$rule[0],array_slice($rule,2)));
             else
                 throw new CException(Yii.t("yii", "{class} has an invalid validation rule. The rule must specify attributes to be validated and the validator name.",
-                    array("{class}", get_class($this))));
+                    array("{class}", get_class(this))));
         }
         return validators;
     }
