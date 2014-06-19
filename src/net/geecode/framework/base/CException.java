@@ -27,7 +27,17 @@ public class CException extends RuntimeException
     public CException(String str, int errCode)
     {
         super(str);
-        code = errCode;
+        setCode(errCode);
+    }
+
+    public int getCode()
+    {
+        return code;
+    }
+
+    public void setCode(int code)
+    {
+        this.code = code;
     }
 
 }

@@ -213,23 +213,23 @@ public class CDbConnection extends CApplicationComponent
         $this.setActive(true);
         return $this._pdo.lastInsertId($sequenceName);
     }
-    public function quoteValue($str)
+    public String quoteValue(String str)
     {
-        if(is_int($str) || is_float($str))
-            return $str;
+        if(is_int(str) || is_float(str))
+            return str;
         $this.setActive(true);
-        if(($value=$this._pdo.quote($str))!=false)
+        if(($value=this._pdo.quote(str))!=false)
             return $value;
         else  // the driver doesn't support quote (e.g. oci)
-            return "'" . addcslashes(str_replace("'", "''", $str), "\000\n\r\\\032") . "'";
+            return "'" + addcslashes(str_replace("'", "''", $str), "\000\n\r\\\032") + "'";
     }
-    public function quoteTableName($name)
+    public String quoteTableName(String name)
     {
-        return $this.getSchema().quoteTableName($name);
+        return this.getSchema().quoteTableName(name);
     }
-    public function quoteColumnName($name)
+    public String quoteColumnName(String name)
     {
-        return $this.getSchema().quoteColumnName($name);
+        return this.getSchema().quoteColumnName(name);
     }
     public function getPdoType(String type)
     {

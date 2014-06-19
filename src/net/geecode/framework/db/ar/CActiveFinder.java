@@ -21,6 +21,7 @@ import static net.geecode.php.base.Global.strrpos;
 import static net.geecode.php.base.Global.trim;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -80,38 +81,39 @@ class CActiveFinder extends CComponent
      * @param boolean $all whether to bring back all records
      * @return mixed the query result
      */
-    public Object query(CDbCriteria criteria, boolean all/*=false*/)
+    public Collection<Object> query(CDbCriteria criteria, boolean all/*=false*/)
     {
         this.joinAll = criteria.together == true;
 
-        if($criteria.alias!="")
+        if(criteria.alias!="")
         {
-            this._joinTree.tableAlias=$criteria.alias;
-            this._joinTree.rawTableAlias=this._builder.getSchema().quoteTableName($criteria.alias);
+            this._joinTree.tableAlias = criteria.alias;
+            this._joinTree.rawTableAlias=this._builder.getSchema().quoteTableName(criteria.alias);
         }
 
-        this._joinTree.find($criteria);
+        this._joinTree.find(criteria);
         this._joinTree.afterFind();
 
-        if($all)
+        Collection result;
+        if(all)
         {
-            $result = array_values(this._joinTree.records);
-            if ($criteria.index!=null)
+            result = this._joinTree.records.values();
+            if (criteria.index!=null)
             {
-                $index=$criteria.index;
-                $array=array();
-                for($result as $object)
+                String index = criteria.index;
+                Map<String, Object> array = array();
+                for(Object object : result/* as $object*/)
                     $array[$object.$index]=$object;
-                $result=$array;
+                result = array.values();
             }
         }
-        else if(count(this._joinTree.records))
-            $result = reset(this._joinTree.records);
+        else if(!this._joinTree.records.isEmpty())
+            result = /*reset*/(this._joinTree.records.values());
         else
-            $result = null;
+            result = null;
 
         this.destroyJoinTree();
-        return $result;
+        return result;
     }
 
     /**
@@ -125,13 +127,14 @@ class CActiveFinder extends CComponent
     {
         Yii.trace(get_class(this._joinTree.model)+".findBySql() eagerly",
                 "system.db.ar.CActiveRecord");
-        if(($row=this._builder.createSqlCommand($sql,$params).queryRow())!=false)
+        CDbCommand row;
+        if((row=this._builder.createSqlCommand(sql, params).queryRow())!=false)
         {
-            $baseRecord=this._joinTree.model.populateRecord($row,false);
-            this._joinTree.findWithBase($baseRecord);
+            CActiveRecord baseRecord = this._joinTree.model.populateRecord(row, false);
+            this._joinTree.findWithBase(baseRecord);
             this._joinTree.afterFind();
             this.destroyJoinTree();
-            return $baseRecord;
+            return baseRecord;
         }
         else
             this.destroyJoinTree();
