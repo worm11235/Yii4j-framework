@@ -48,7 +48,7 @@ public class CDbCriteria extends CComponent
      * statement. The property can be either a string (column names separated by commas)
      * or an array of column names. Defaults to '*', meaning all columns.
      */
-    public String select = "*";
+    public List<String> select = Arrays.asList("*");
     /**
      * @var boolean whether to select distinct rows of data only. If this is set true,
      * the SELECT clause would be changed to SELECT DISTINCT.
@@ -582,18 +582,16 @@ public class CDbCriteria extends CComponent
     {
         if(this.select != criteria.select)
         {
-            if(this.select=="*")
+            if(this.select.contains("*")/* && this.select.size() == 1*/)
                 this.select=criteria.select;
-            else if(criteria.select!="*")
+            else if(!criteria.select.contains("*"))
             {
-                String select1 = is_string(this.select) ?
-                        preg_split("/\\s*,\\s*/", trim(this.select), -1, 
-                                PREG_SPLIT_NO_EMPTY) : 
-                                    this.select;
-                String select2 = is_string(criteria.select) ?
-                        preg_split("/\\s*,\\s*/", trim(criteria.select),
-                                -1, PREG_SPLIT_NO_EMPTY) : criteria.select;
-                this.select = array_merge(select1, array_diff(select2, select1));
+                List<String> select1 = this.select;
+                List<String> select2 = criteria.select;
+                this.select.clear();
+                this.select.addAll(select1);
+                select2.removeAll(select1);
+                this.select.addAll(select2);
             }
         }
 
@@ -607,7 +605,7 @@ public class CDbCriteria extends CComponent
         }
 
         if (!this.params.equals(criteria.params))
-            this.params = array_merge(this.params, criteria.params);
+            this.params.putAll(criteria.params);
 
         if (criteria.limit > 0)
             this.limit = criteria.limit;
@@ -672,27 +670,29 @@ public class CDbCriteria extends CComponent
                 /*if(is_integer(k))
                     scopes[]=$v;
                 else */if(isset(scopes2, k))
-                    scopes[] = array(k, v);
+                    ((List)scopes).add(array(k, v));
                 else
-                    scopes[$k]=$v;
+                    ((Map)scopes).put(k, v);
             }
             for(Entry<String, Object> ent : scopes2.entrySet()/* as $k=>$v*/)
             {
+                String k = ent.getKey();
+                Object v = ent.getValue();
                 /*if(is_integer($k))
                     $scopes[]=$v;
-                else*/if(isset($scopes1[$k]))
-                    $scopes[]=array($k=>$v);
+                else*/if(isset(scopes1, k))
+                    ((List)scopes).add(array(k, v));
                 else
-                    $scopes[$k]=$v;
+                    ((Map)scopes).put(k, v);
             }
-            $this.scopes=$scopes;
+            this.scopes = scopes;
         }
 
         if(null == (this.with))
             this.with = criteria.with;
         else if(null !=/*empty*/(criteria.with))
         {
-            this.with = /*(array)*/this.with;
+            Map mw = /*(array)*/(Map) this.with;
             for (Entry<String, Object> ent :
                 ((Map<String, Object>)criteria.with).entrySet()/* as $k=>$v*/)
             {
@@ -700,27 +700,33 @@ public class CDbCriteria extends CComponent
                 Object v = ent.getValue();
                 /*if(is_integer($k))
                     $this.with[]=$v;
-                else*/if(isset((Map)this.with, k))
+                else*/if(isset(mw, k))
                 {
                     Map<String, Object> excludes = array();
                     for(String opt : Arrays.asList("joinType","on")/* as $opt*/)
                     {
-                        if(isset((Map)this.with, k) && isset((Map)((Map)this.with).get(k),opt))
-                            excludes[$opt]=$this.with[$k][$opt];
-                        if(isset($v[$opt]))
-                            $excludes[$opt]= ($opt==="on" && isset($excludes[$opt]) && $v[$opt]!==$excludes[$opt]) ?
-                                "($excludes[$opt]) AND $v[$opt]" : $v[$opt];
-                        unset($this.with[$k][$opt]);
-                        unset($v[$opt]);
+                        if(isset(mw, k) && isset((Map)(mw).get(k),opt))
+                            excludes.put(opt, ((Map)(mw).get(k)).get(opt));
+                        if(isset((Map)v, opt))
+                            excludes.put(opt, (opt.equals("on") && isset(excludes, opt) && ((Map)v).get(opt)
+                                    != excludes.get(opt)) ?
+                                            "($excludes[$opt]) AND $v[$opt]" : ((Map)v).get(opt));
+                        ((Map)(mw).get(k)).remove(opt);
+                        ((Map)v).remove(opt);
                     }
-                    $this.with[$k]=new self($this.with[$k]);
-                    $this.with[$k].mergeWith($v,$operator);
-                    $this.with[$k]=$this.with[$k].toArray();
-                    if (count($excludes)!==0)
-                        $this.with[$k]=CMap::mergeArray($this.with[$k],$excludes);
+                    CDbCriteria cdc = new CDbCriteria((Map<String, Object>) mw.get(k));
+                    mw.put(k, cdc);
+                    cdc.mergeWith((CDbCriteria) v, operator);
+                    Map<String, Object> mta = cdc.toArray();
+                    mw.put(k, mta);
+                    if (!excludes.isEmpty())
+                    {
+                        mta.putAll(excludes);
+                        mw.put(k, mta);
+                    }
                 }
                 else
-                    this.with[k]=v;
+                    mw.put(k, v);
             }
         }
     }

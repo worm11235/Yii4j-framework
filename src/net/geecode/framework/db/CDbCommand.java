@@ -98,7 +98,7 @@ import net.geecode.framework.lite.Yii;
  * @package system.db
  * @since 1.0
  */
-class CDbCommand extends CComponent
+public class CDbCommand extends CComponent
 {
     /**
      * @var array the parameters (name=>value) to be bound to the current query.
@@ -149,9 +149,8 @@ class CDbCommand extends CComponent
         this.setText(query);
     }
 
-    public CDbCommand(CDbConnection $connection, Map<String, Object> query/*
-                                                                           * =null
-                                                                           */)
+    public CDbCommand(CDbConnection $connection,
+            Map<String, Object> query/* =null*/)
     {
         this._connection = $connection;
         for (Entry<String, Object> e : query.entrySet()/* as $name=>$value */)
@@ -348,7 +347,7 @@ class CDbCommand extends CComponent
         else
             this._statement.bindParam(name, value, dataType, length,
                     driverOptions);
-        this._paramLog[name] = value;
+        this._paramLog.put((String) name, value);
         return this;
     }
 
@@ -369,9 +368,8 @@ class CDbCommand extends CComponent
      * @return CDbCommand the current command being executed
      * @see http://www.php.net/manual/en/function.PDOStatement-bindValue.php
      */
-    public CDbCommand bindValue(String name, Object value, Integer dataType/*
-                                                                            * =null
-                                                                            */)
+    public CDbCommand bindValue(String name, Object value,
+            Integer dataType/* =null */)
     {
         this.prepare();
         if (dataType == null)
@@ -401,9 +399,11 @@ class CDbCommand extends CComponent
         this.prepare();
         for (Entry<String, Object> e : values.entrySet()/* as $name=>$value */)
         {
-            this._statement.bindValue($name, $value,
-                    this._connection.getPdoType(gettype($value)));
-            this._paramLog[$name] = $value;
+            String name = e.getKey();
+            Object value = e.getValue();
+            this._statement.bindValue(name, value,
+                    this._connection.getPdoType(gettype(value)));
+            this._paramLog.put(name, value);
         }
         return this;
     }
@@ -657,82 +657,89 @@ class CDbCommand extends CComponent
     private Object queryInternal(String method, Object mode,
             Map<String, Object> params/*=array()*/)
     {
-        $params=array_merge(this.params,$params);
+        params.putAll(this.params);
+//        $params=array_merge(this.params,$params);
 
-        if(this._connection.enableParamLogging &&
-                (pars=array_merge(this._paramLog, params)) != array())
+        Map<String, Object> pars = new HashMap<String, Object>();
+        pars.putAll(params);
+        pars.putAll(this._paramLog);
+        String par;
+        if(this._connection.enableParamLogging && !(pars).isEmpty())
         {
-            p=array();
-            for (pars as $name=>$value)
-                p[name] = name+'='+var_export(value, true);
-                    par=". Bound with "+implode(", ", p);
+            Map<String, Object> p = array();
+            for (Entry<String, Object> e : pars.entrySet()/* as $name=>$value*/)
+                p.put(e.getKey(), e.getKey()+'='+var_export(e.getValue(), true));
+            par=". Bound with "+implode(", ", p);
         }
         else
             par="";
 
         Yii.log("Querying SQL: "+this.getText()+par, "system.db.CDbCommand");
 
+        Object cache;
+        String cacheKey;
+        Object[] result;
         if(this._connection.queryCachingCount>0 && method != ""
                 && this._connection.queryCachingDuration > 0
-                && this._connection.queryCacheID != false
-                && ($cache=Yii.app().getComponent(this._connection.queryCacheID)) != null)
+                && this._connection.queryCacheID != null
+                && (cache=Yii.app().getComponent(this._connection.queryCacheID)) != null)
         {
             this._connection.queryCachingCount--;
             cacheKey = "yii:dbquery"+this._connection.connectionString+":"+this._connection.username;
-            cacheKey += ':'+this.getText()+':'+serialize(array_merge(this._paramLog,$params));
-            if(($result=$cache.get($cacheKey))!=false)
+            cacheKey += ':'+this.getText()+':'+serialize(pars/*array_merge(this._paramLog, params)*/);
+            if((result = cache.get(cacheKey))!=null)
             {
                 Yii.trace("Query result found in cache","system.db.CDbCommand");
-                return $result[0];
+                return result[0];
             }
         }
 
         try
         {
             if(this._connection.enableProfiling)
-                Yii.beginProfile("system.db.CDbCommand.query(".this.getText().$par.")","system.db.CDbCommand.query");
+                Yii.beginProfile("system.db.CDbCommand.query("+this.getText()+par+")", "system.db.CDbCommand.query");
             
             this.prepare();
-            if($params==array())
-                this._statement.execute();
+            if(params.isEmpty())
+                this._statement.execute(null);
             else
-                this._statement.execute($params);
+                this._statement.execute(params);
 
-            if($method=="")
-                $result=new CDbDataReader($this);
+            if(method.equals(""))
+                result=new CDbDataReader(this);
             else
             {
-                $mode=(array)$mode;
-                call_user_func_array(array(this._statement, "setFetchMode"), $mode);
-                $result=this._statement.$method();
+                mode=(array)mode;
+                call_user_func_array(array(this._statement, "setFetchMode"), mode);
+                result = this._statement.$method();
                 this._statement.closeCursor();
             }
 
             if(this._connection.enableProfiling)
-                Yii.endProfile("system.db.CDbCommand.query(".this.getText().$par.")","system.db.CDbCommand.query");
+                Yii.endProfile("system.db.CDbCommand.query("+this.getText()+par+")","system.db.CDbCommand.query");
             
-            if(isset($cache,$cacheKey))
-                $cache.set($cacheKey, array($result), this._connection.queryCachingDuration, this._connection.queryCachingDependency);
+            if(isset(cache, cacheKey))
+                cache.set(cacheKey, array(result), this._connection.queryCachingDuration, this._connection.queryCachingDependency);
 
-            return $result;
+            return result;
         }
-        catch(Exception $e)
+        catch(Exception e)
         {
             if(this._connection.enableProfiling)
-                Yii.endProfile("system.db.CDbCommand.query(".this.getText().$par.")","system.db.CDbCommand.query");
+                Yii.endProfile("system.db.CDbCommand.query("+this.getText()+par+")","system.db.CDbCommand.query");
             
-            $errorInfo=$e instanceof PDOException ? $e.errorInfo : null;
-                     $message=$e.getMessage();
-                     Yii.log(Yii.t("yii","CDbCommand::{method}() failed: {error}. The SQL statement executed was: {sql}.",
-                         array("{method}"=>$method, "{error}"=>$message, "{sql}"=>this.getText().$par)),CLogger::LEVEL_ERROR,"system.db.CDbCommand");
+            String errorInfo = e instanceof PDOException ? e.errorInfo : null;
+            String message = e.getMessage();
+            Yii.log(Yii.t("yii","CDbCommand::{method}() failed: {error}. The SQL statement executed was: {sql}.",
+                    array("{method}", method, "{error}", message, "{sql}", this.getText()+par)), CLogger.LEVEL_ERROR,"system.db.CDbCommand");
 
-                     if(YII_DEBUG)
-                         $message.=". The SQL statement executed was: ".this.getText().$par;
+            if(YII_DEBUG)
+                message += ". The SQL statement executed was: "+this.getText()+par;
 
-                     throw new CDbException(Yii.t("yii","CDbCommand failed to execute the SQL statement: {error}",
-                         array("{error}"=>$message)),(int)$e.getCode(),$errorInfo);
-                 }
-             }
+            throw new CDbException(Yii.t("yii","CDbCommand failed to execute the SQL statement: {error}",
+                    array("{error}", message)),(int)e.getCode(), errorInfo);
+        }
+    }
 
     /**
      * Builds a SQL SELECT statement from the given query specification.
@@ -749,40 +756,42 @@ class CDbCommand extends CComponent
      * @since 1.1.6
      */
     public String buildQuery(Map<String, Object> query)
-             {
-                 sql = query.containsKey("distinct") ? "SELECT DISTINCT" : "SELECT";
-                 sql += " "+query.containsKey("select") ? query.get("select") : "*");
+    {
+        String sql = query.containsKey("distinct") ? "SELECT DISTINCT" : "SELECT";
+        sql += " "+ (query.containsKey("select") ? query.get("select") : "*");
 
-                 if(!empty($query["from"]))
-                     sql +="\nFROM ".$query["from"];
-                 else
-                     throw new CDbException(Yii.t("yii","The DB query must contain the "from" portion."));
+        if(!query.containsKey("from"))
+            sql +="\nFROM " + query.get("from");
+        else
+            throw new CDbException(Yii.t("yii","The DB query must contain the \"from\" portion."));
 
-                 if(!empty($query["join"]))
-                     $sql.="\n".(is_array($query["join"]) ? implode("\n",$query["join"]) : $query["join"]);
+        if(!query.containsKey("join"))
+            sql += "\n"+(is_array(query.get("join")) ? implode("\n", (Collection)query.get("join")) : query.get("join"));
 
-                 if(!empty($query["where"]))
-                     $sql.="\nWHERE ".$query["where"];
+        if(!query.containsKey("where"))
+            sql += "\nWHERE " + query.get("where");
 
-                 if(!empty($query["group"]))
-                     $sql.="\nGROUP BY ".$query["group"];
+        if(!query.containsKey("group"))
+            sql += "\nGROUP BY " + query.get("group");
 
-                 if(!empty($query["having"]))
-                     $sql.="\nHAVING ".$query["having"];
+        if(!query.containsKey("having"))
+            sql += "\nHAVING " + query.get("having");
 
-                 if(!empty($query["union"]))
-                     $sql.="\nUNION (\n".(is_array($query["union"]) ? implode("\n) UNION (\n",$query["union"]) : $query["union"]) . ")";
+        if(!query.containsKey("union"))
+            sql += "\nUNION (\n"+(is_array(query.get("union"))
+                    ? implode("\n) UNION (\n", (Collection)query.get("union"))
+                            : query.get("union")) + ")";
 
-                 if(!empty($query["order"]))
-                     $sql.="\nORDER BY ".$query["order"];
+        if(!query.containsKey("order"))
+            sql += "\nORDER BY " + query.get("order");
 
-                 $limit=isset($query["limit"]) ? (int)$query["limit"] : -1;
-                 $offset=isset($query["offset"]) ? (int)$query["offset"] : -1;
-                 if($limit>=0 || $offset>0)
-                     $sql=this._connection.getCommandBuilder().applyLimit($sql,$limit,$offset);
+        int limit = isset(query, "limit") ? (Integer)query.get("limit") : -1;
+        int offset = isset(query, "offset") ? (Integer)query.get("offset") : -1;
+        if (limit >= 0 || offset > 0)
+            sql = this._connection.getCommandBuilder().applyLimit(sql, limit, offset);
 
-                 return $sql;
-             }
+        return sql;
+    }
 
     /**
      * Sets the SELECT part of the query.
@@ -804,34 +813,45 @@ class CDbCommand extends CComponent
      * @return CDbCommand the command object itself
      * @since 1.1.6
      */
-    public CDbCommand select(String columns/*='*'*/, String option/*=""*/)
-             {
-                 if(is_string($columns) && strpos($columns,'(') != -1)
-                     this._query["select"]=$columns;
-                 else
-                 {
-                     if(!is_array($columns))
-                         $columns=preg_split("/\\s*,\\s*/", trim($columns), -1, PREG_SPLIT_NO_EMPTY);
-
-                     for ($columns as $i=>$column)
-                     {
-                         if(is_object($column))
-                             $columns[$i]=(string)$column;
-                         else if(strpos($column,'(')==false)
-                         {
-                             if(preg_match("/^(.*?)(?i:\\s+as\\s+|\\s+)(.*)$/",$column,$matches))
-                                 $columns[$i]=this._connection.quoteColumnName($matches[1])+" AS "
-                                         +this._connection.quoteColumnName($matches[2]);
-                             else
-                                 $columns[$i]=this._connection.quoteColumnName($column);
-                         }
-                     }
-                     this._query["select"]=implode(", ",$columns);
-                 }
-                 if($option!="")
-                     this._query["select"]=$option." ".this._query["select"];
-                 return $this;
-             }
+    public CDbCommand select(Object[] columns/*='*'*/, String option/*=""*/)
+    {
+//            if(!is_array(columns))
+//                columns = preg_split("/\\s*,\\s*/", trim(columns), -1, PREG_SPLIT_NO_EMPTY);
+            
+        for (int i = 0; i < columns.length; i++/* as $i=>$column*/)
+        {
+            Object column = (String) columns[i];
+            if(!(columns[i] instanceof String))
+            {
+                columns[i] = column + "";
+            }
+            else if(strpos((String)column, "(") == -1)
+            {
+                List<String> matches = new ArrayList<String>();
+                if(preg_match("/^(.*?)(?i:\\s+as\\s+|\\s+)(.*)$/", column, matches))
+                    columns[i] = this._connection.quoteColumnName(matches.get(1))+" AS "
+                            +this._connection.quoteColumnName(matches.get(2));
+                else
+                    columns[i] = this._connection.quoteColumnName((String) column);
+            }
+        }
+        this._query.put("select", implode(", ", columns));
+        if (!option.equals(""))
+            this._query.put("select", option+" "+this._query.get("select"));
+        return this;
+    }
+//    public CDbCommand select(String columns/*='*'*/, String option/*=""*/)
+//    {
+//
+//        if(is_string(columns) && strpos(columns,"(") != -1)
+//            this._query.put("select", columns);
+//        else
+//        {
+//            if(!is_array(columns))
+//                columns = preg_split("/\\s*,\\s*/", trim(columns), -1, PREG_SPLIT_NO_EMPTY);
+//
+//            for ($columns as $i=>$column)
+//    }
 
     /**
      * Returns the SELECT part in the query.
@@ -841,7 +861,7 @@ class CDbCommand extends CComponent
      */
     public String getSelect()
     {
-        return isset(this._query, "select") ? this._query["select"] : "";
+        return (String) (isset(this._query, "select") ? this._query.get("select") : "");
     }
 
     /**
@@ -854,7 +874,16 @@ class CDbCommand extends CComponent
      */
     public void setSelect(Object value)
     {
-        this.select(value);
+        Object[] param;
+        if (value.getClass().isArray())
+        {
+            param = (Object[]) value;
+        }
+        else
+        {
+            param = new Object[]{value};
+        }
+        this.select(param, "");
     }
 
     /**
@@ -869,8 +898,9 @@ class CDbCommand extends CComponent
      */
     public CDbCommand selectDistinct(Object columns/* ='*' */)
     {
-        this._query["distinct"] = true;
-        return this.select($columns);
+        this._query.put("distinct", true);
+        this.setSelect(columns);
+        return this;
     }
 
     /**
@@ -882,7 +912,7 @@ class CDbCommand extends CComponent
      */
     public boolean getDistinct()
     {
-        return isset(this._query, "distinct") ? this._query["distinct"] : false;
+        return isset(this._query, "distinct") ? (Boolean)this._query.get("distinct") : false;
     }
 
     /**
@@ -912,28 +942,47 @@ class CDbCommand extends CComponent
      * @return CDbCommand the command object itself
      * @since 1.1.6
      */
-    public CDbCommand from(Object tables)
+    public CDbCommand from(List<String> tables)
     {
-        if(is_string($tables) && strpos($tables,'(')!=false)
-            this._query["from"]=$tables;
+        for (int i = 0; i < tables.size(); i++/*as $i=>$table*/)
+        {
+            String table = tables.get(i);
+            List<String> matches = new ArrayList<String>();
+            if(strpos(table,"(") == -1)
+            {
+                if(preg_match("/^(.*?)(?i:\\s+as\\s+|\\s+)(.*)$/", table, matches))  // with alias
+                    tables.set(i, this._connection.quoteTableName(matches.get(1))
+                            +" "+this._connection.quoteTableName(matches.get(2)));
+                else
+                    tables.set(i, this._connection.quoteTableName(table));
+            }
+        }
+        this._query.put("from", implode(", ", tables));
+        return this;
+    }
+    public CDbCommand from(String tables)
+    {
+        if(strpos(tables, "(") != -1)
+            this._query.put("from", tables);
         else
         {
-            if(!is_array($tables))
-                tables=preg_split("/\\s*,\\s*/",trim($tables),-1,PREG_SPLIT_NO_EMPTY);
-            for ($tables as $i=>$table)
+            String[] tabs = preg_split("/\\s*,\\s*/",trim(tables),-1,PREG_SPLIT_NO_EMPTY);
+            for (int i = 0; i < tabs.length; i++/* as $i=>$table*/)
             {
-                if(strpos($table,"(")==false)
+                String table = tabs[i];
+                if(strpos(table, "(") == -1)
                 {
-                    if(preg_match("/^(.*?)(?i:\\s+as\\s+|\\s+)(.*)$/",$table,$matches))  // with alias
-                        $tables[$i]=this._connection.quoteTableName($matches[1])
-                                +" "+this._connection.quoteTableName($matches[2]);
+                    List<String> matches = new ArrayList<String>();
+                    if(preg_match("/^(.*?)(?i:\\s+as\\s+|\\s+)(.*)$/", table, matches))  // with alias
+                        tabs[i] = this._connection.quoteTableName(matches.get(1))
+                                +" "+this._connection.quoteTableName(matches.get(2));
                     else
-                        $tables[$i]=this._connection.quoteTableName($table);
+                        tabs[i] = this._connection.quoteTableName(table);
                 }
             }
-            this._query["from"]=implode(", ",$tables);
+            this._query.put("from", implode(", ", tabs));
         }
-        return $this;
+        return this;
     }
 
     /**
@@ -957,7 +1006,7 @@ class CDbCommand extends CComponent
      */
     public void setFrom(Object value)
     {
-        this.from(value);
+        this.from((List<String>) value);
     }
 
     /**
@@ -1394,9 +1443,9 @@ class CDbCommand extends CComponent
                     List<String> matches = new ArrayList<String>();
                     if(preg_match("/^(.*?)\\s+(asc|desc)$/i", column, matches))
                         columns[i] = this._connection.quoteColumnName(matches.get(1))
-                                +" "+strtoupper(matches.get(2));
+                                +" "+/*strtoupper*/(matches.get(2).toUpperCase());
                     else
-                        columns[i] = this._connection.quoteColumnName(column);
+                        columns[i] = this._connection.quoteColumnName((String) column);
                 }
             }
             this._query.put("order", implode(", ", columns));
@@ -1565,26 +1614,27 @@ class CDbCommand extends CComponent
      */
     public int insert(String table, Map<String, Object> columns)
     {
-        Map paras=array();
-        List names=new ArrayList();
-        List placeholders=new ArrayList();
+        Map<String, Object> paras=array();
+        List<String> names=new ArrayList<String>();
+        List<String> placeholders = new ArrayList<String>();
         for (Entry<String, Object> e : columns.entrySet()/* as $name=>$value*/)
         {
+            String name = e.getKey();
             names.add(this._connection.quoteColumnName(e.getKey()));
             if(e.getValue() instanceof CDbExpression)
             {
                 CDbExpression value = e.getValue();
                 placeholders.add(value.expression);
                 for (Entry se : value.params/* as $n => $v*/)
-                    paras.put(se.getKey(), se.getValue());
+                    paras.put(se.getKey() + "", se.getValue());
             }
             else
             {
                 placeholders.add(':' + name);
-                paras.put(':' + name, value);
+                paras.put(':' + name, e.getValue());
             }
         }
-        sql = "INSERT INTO " + this._connection.quoteTableName(table)
+        String sql = "INSERT INTO " + this._connection.quoteTableName(table)
                 + " (" + implode(", ", names) + ") VALUES ("
                 + implode(", ", placeholders) + ")";
         return this.setText(sql).execute(paras);
@@ -1611,16 +1661,17 @@ class CDbCommand extends CComponent
     public int update(String table, Map<String, Object> columns, Object conditions/*=""*/,
                      Map<String, Object> params/*=array()*/)
     {
-        List lines = new ArrayList();
+        List<String> lines = new ArrayList<String>();
         for (Entry<String, Object> e : columns.entrySet()/* as $name=>$value*/)
         {
             String name = e.getKey();
             if(e.getValue() instanceof CDbExpression)
             {
                 CDbExpression value = e.getValue();
-                lines.add(this._connection.quoteColumnName($name) + "=" + value.expression);
-                for (Entry se : value.params.entrySet()/* as $n => $v*/)
-                    params.put(n, v);
+                lines.add(this._connection.quoteColumnName(name) + "=" + value.expression);
+//                for (Entry se : value.params.entrySet()/* as $n => $v*/)
+//                    params.put(n, v);
+                params.putAll(value.params);
             }
             else
             {
@@ -1630,7 +1681,7 @@ class CDbCommand extends CComponent
         }
         String sql = "UPDATE " + this._connection.quoteTableName(table) + " SET "
                     + implode(", ", lines);
-        String where=this.processConditions(conditions);
+        String where=this.processConditions((Map<String, Object>) conditions);
         if(where != "")
             sql += " WHERE " + where;
         return this.setText(sql).execute(params);
@@ -2059,21 +2110,21 @@ class CDbCommand extends CComponent
                 table=this._connection.quoteTableName(matches.get(1)) + " "
                         + this._connection.quoteTableName(matches.get(2));
             else
-                table=this._connection.quoteTableName($table);
+                table=this._connection.quoteTableName(table);
         }
 
-        $conditions=this.processConditions($conditions);
-        if($conditions!="")
-            $conditions=" ON ".$conditions;
+        conditions=this.processConditions((Map<String, Object>) conditions);
+        if(conditions!="")
+            conditions = " ON " + conditions;
 
         if(isset(this._query,"join") && is_string(this._query.get("join")))
             this._query.put("join", Arrays.asList((String)this._query.get("join")));
 
-        ((List<String>)this._query.get("join")).add(strtoupper(type) + " " + table + conditions);
+        ((List<String>)this._query.get("join")).add(/*strtoupper*/(type.toUpperCase()) + " " + table + conditions);
 
 //        for (Entry<String, Object> e : params.entrySet()/* as $name=>$value*/)
         this.params.putAll(params);
-        return $this;
+        return this;
     }
     
     private CDbCommand joinInternal(String type, String table, Object conditions/*=""*/)

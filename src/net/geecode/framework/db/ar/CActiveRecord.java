@@ -1459,7 +1459,7 @@ abstract class CActiveRecord extends CModel
                  {
                      $scs=this.scopes();
                      $c=this.getDbCriteria();
-                     foreach((array)$criteria.scopes as $k=>$v)
+                     foreach((array)criteria.scopes as $k=>$v)
                      {
                          if(is_integer($k))
                          {
@@ -2354,191 +2354,19 @@ abstract class CActiveRecord extends CModel
               */
              public void mergeWith(Object criteria, boolean fromScope/*=false*/)
              {
+                 Map<String, Object> mc;
                  if (criteria instanceof CDbCriteria)
-                     criteria = criteria.toArray();
-                 super.mergeWith(criteria, fromScope);
-                 if(isset($criteria["limit"]) && $criteria["limit"]>0)
-                     this.limit=$criteria["limit"];
-
-                 if(isset($criteria["offset"]) && $criteria["offset"]>=0)
-                     this.offset=$criteria["offset"];
-
-                 if(isset($criteria["index"]))
-                     this.index=$criteria["index"];
-             }
-         }
-
-
-         /**
-          * CManyManyRelation represents the parameters specifying a MANY_MANY relation.
-          * @author Qiang Xue <qiang.xue@gmail.com>
-          * @package system.db.ar
-          * @since 1.0
-          */
-         class CManyManyRelation extends CHasManyRelation
-         {
-             /**
-              * @var string name of the junction table for the many-to-many relation.
-              */
-             private String _junctionTableName=null;
-             /**
-              * @var array list of foreign keys of the junction table for the many-to-many relation.
-              */
-             private Map _junctionForeignKeys=null;
-
-             /**
-              * @return string junction table name.
-              * @since 1.1.12
-              */
-             public String getJunctionTableName()
-             {
-                 if (this._junctionTableName == null)
-                     this.initJunctionData();
-                 return this._junctionTableName;
-             }
-
-             /**
-              * @return array list of junction table foreign keys.
-              * @since 1.1.12
-              */
-             public Map getJunctionForeignKeys()
-             {
-                 if (this._junctionForeignKeys == null)
-                     this.initJunctionData();
-                 return this._junctionForeignKeys;
-             }
-
-             /**
-              * Initializes values of {@link junctionTableName} and {@link junctionForeignKeys} parsing
-              * {@link foreignKey} value.
-              * @throws CDbException if {@link foreignKey} has been specified in wrong format.
-              */
-             private void initJunctionData()
-             {
-                 if(!preg_match("/^\\s*(.*?)\\((.*)\\)\\s*$/",this.foreignKey,$matches))
-                     throw new CDbException(Yii.t("yii",
-                             "The relation \"{relation}\" in active record class \"{class}\" is specified"
-                             + " with an invalid foreign key. The format of the foreign key must be "
-                             + "\"joinTable(fk1,fk2,...)\".",
-                             array("{class}", this.className, "{relation}", this.name)));
-                 this._junctionTableName=$matches[1];
-                 this._junctionForeignKeys=preg_split("/\\s*,\\s*/",$matches[2],-1,PREG_SPLIT_NO_EMPTY);
-             }
-         }
-
-
-         /**
-          * CActiveRecordMetaData represents the meta-data for an Active Record class.
-          *
-          * @author Qiang Xue <qiang.xue@gmail.com>
-          * @package system.db.ar
-          * @since 1.0
-          */
-         class CActiveRecordMetaData
-         {
-             /**
-              * @var CDbTableSchema the table schema information
-              */
-             public CDbTableSchema tableSchema;
-             /**
-              * @var array table columns
-              */
-             public Map<String, Object> columns;
-             /**
-              * @var array list of relations
-              */
-             public Map<String, CActiveRelation> relations = new HashMap<String, CActiveRelation>();
-             /**
-              * @var array attribute default values
-              */
-             public Map<String, Object> attributeDefaults=array();
-
-             private String _modelClassName;
-
-             /**
-              * Constructor.
-              * @param CActiveRecord $model the model instance
-              * @throws CDbException if specified table for active record class cannot be found in the database
-              */
-             public CActiveRecordMetaData (CActiveRecord model)
-             {
-                 this._modelClassName=get_class($model);
-
-                 $tableName=$model.tableName();
-                 if(($table=$model.getDbConnection().getSchema().getTable($tableName))===null)
-                     throw new CDbException(Yii::t("yii","The table "{table}" for active record class "{class}" cannot be found in the database.",
-                         array("{class}"=>this._modelClassName,"{table}"=>$tableName)));
-                 if($table.primaryKey===null)
-                 {
-                     $table.primaryKey=$model.primaryKey();
-                     if(is_string($table.primaryKey) && isset($table.columns[$table.primaryKey]))
-                         $table.columns[$table.primaryKey].isPrimaryKey=true;
-                     elseif(is_array($table.primaryKey))
-                     {
-                         foreach($table.primaryKey as $name)
-                         {
-                             if(isset($table.columns[$name]))
-                                 $table.columns[$name].isPrimaryKey=true;
-                         }
-                     }
-                 }
-                 this.tableSchema=$table;
-                 this.columns=$table.columns;
-
-                 foreach($table.columns as $name=>$column)
-                 {
-                     if(!$column.isPrimaryKey && $column.defaultValue!==null)
-                         this.attributeDefaults[$name]=$column.defaultValue;
-                 }
-
-                 foreach($model.relations() as $name=>$config)
-                 {
-                     this.addRelation($name,$config);
-                 }
-             }
-
-             /**
-              * Adds a relation.
-              *
-              * $config is an array with three elements:
-              * relation type, the related active record class and the foreign key.
-              *
-              * @throws CDbException
-              * @param string $name $name Name of the relation.
-              * @param array $config $config Relation parameters.
-              * @return void
-              * @since 1.1.2
-              */
-             public void addRelation(String name, Map<String, Object> config)
-             {
-                 if(isset(config[0], config[1], config[2]))  // relation class, AR class, FK
-                     this.relations[name] = new config[0](name, config[1], config[2], array_slice(config,3));
+                     mc = ((CDbCriteria) criteria).toArray();
                  else
-                     throw new CDbException(Yii.t("yii","Active record \"{class}\" has an invalid configuration for relation "{relation}". It must specify the relation type, the related active record class and the foreign key.",
-                             array("{class}", this._modelClassName, "{relation}", name)));
-             }
+                     mc = (Map<String, Object>) criteria;
+                 super.mergeWith(criteria, fromScope);
+                 if(isset(mc, "limit") && (Integer)mc.get("limit")>0)
+                     this.limit = (Integer) mc.get("limit");
 
-             /**
-              * Checks if there is a relation with specified name defined.
-              *
-              * @param string $name $name Name of the relation.
-              * @return boolean
-              * @since 1.1.2
-              */
-             public boolean hasRelation(String name)
-             {
-                 return isset(this.relations[name]);
-             }
+                 if(isset(mc, "offset") && (Integer)mc.get("offset")>=0)
+                     this.offset = (Integer) mc.get("offset");
 
-             /**
-              * Deletes a relation with specified name.
-              *
-              * @param string $name $name
-              * @return void
-              * @since 1.1.2
-              */
-             public void removeRelation(String name)
-             {
-                 unset(this.relations[name]);
+                 if(isset(mc, "index"))
+                     this.index = mc.get("index") + "";
              }
          }

@@ -78,9 +78,9 @@ public class CDbTableSchema extends CComponent
     /**
      * @return array list of column names
      */
-    public Collection<String> getColumnNames()
+    public Map<String, CDbColumnSchema> getColumnNames()
     {
-        return this.columns.keySet();
+        return this.columns;
     }
 }
 

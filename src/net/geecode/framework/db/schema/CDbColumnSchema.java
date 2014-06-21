@@ -21,7 +21,7 @@ import static net.geecode.php.base.Global.*;
  * @package system.db.schema
  * @since 1.0
  */
-class CDbColumnSchema extends CComponent
+public class CDbColumnSchema extends CComponent
 {
     /**
      * @var string name of this column (without quotes).

@@ -8,8 +8,11 @@ import java.util.Map;
 
 import net.geecode.framework.base.CException;
 import net.geecode.framework.i18n.CLocale;
+import net.geecode.framework.i18n.CNumberFormatter;
 import net.geecode.framework.lite.CEvent;
+import net.geecode.framework.lite.CHttpRequest;
 import net.geecode.framework.lite.CModule;
+import net.geecode.framework.lite.ICache;
 import net.geecode.framework.lite.Yii;
 import net.geecode.php.base.Global;
 import static net.geecode.php.base.Global.*;
@@ -202,7 +205,7 @@ public abstract class CApplication extends CModule
     {
         CLocale.dataPath=$value;
     }
-    public String getNumberFormatter()
+    public CNumberFormatter getNumberFormatter()
     {
         return this.getLocale(null).getNumberFormatter();
     }
@@ -226,9 +229,9 @@ public abstract class CApplication extends CModule
     {
         return this.getComponent("statePersister");
     }
-    public Object getCache()
+    public ICache getCache()
     {
-        return this.getComponent("cache");
+        return (ICache) this.getComponent("cache");
     }
     public Object getCoreMessages()
     {
@@ -238,9 +241,9 @@ public abstract class CApplication extends CModule
     {
         return this.getComponent("messages");
     }
-    public Object getRequest()
+    public CHttpRequest getRequest()
     {
-        return this.getComponent("request");
+        return (CHttpRequest) this.getComponent("request");
     }
     public Object getUrlManager()
     {
@@ -257,11 +260,11 @@ public abstract class CApplication extends CModule
     
     public String createAbsoluteUrl(String $route, Map $params/*=array()*/,
             String $schema/*=""*/, String $ampersand/*="&"*/)    {
-        String $url=this.createUrl($route,$params,$ampersand);
-        if(strpos($url,"http")==0)
-            return $url;
+        String url=this.createUrl($route,$params,$ampersand);
+        if(strpos(url,"http")==0)
+            return url;
         else
-            return this.getRequest().getHostInfo($schema).$url;
+            return this.getRequest().getHostInfo($schema) + url;
     }
     public String getBaseUrl(boolean $absolute/*=false*/)
     {

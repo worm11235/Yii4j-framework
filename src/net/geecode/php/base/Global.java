@@ -151,6 +151,16 @@ public final class Global
         return str;
     }
     
+    public static String substr(String str, int start)
+    {
+        return str.substring(start);
+    }
+    
+    public static String substr(String str, int start, int end)
+    {
+        return str.substring(start, end);
+    }
+    
     public static void echo(String str)
     {
         ;

@@ -79,7 +79,7 @@ import static net.geecode.php.base.Global.*;
  * @package system.i18n
  * @since 1.0
  */
-class CNumberFormatter extends CComponent
+public class CNumberFormatter extends CComponent
 {
     private CLocale _locale;
     private Map _formats = array();

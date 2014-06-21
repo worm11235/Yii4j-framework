@@ -356,20 +356,20 @@ public class YiiBase
                 if(!$message.contains("#"))
                 {
                     String[] $chunks = explode("|",$message);
-                    Object[] $expressions = _app.getLocale($language).getPluralRules();
-                    Object $n;
-                    if($n=min($chunks.length, $expressions.length))
+                    Map<String, Object> $expressions = _app.getLocale($language).getPluralRules();
+                    int $n = $chunks.length>$expressions.size() ? $expressions.size() : $chunks.length;
+                    if($n != 0)
                     {
-                        for($i=0;$i<$n;$i++)
-                            $chunks[$i]=$expressions[$i]+"#"+$chunks[$i];
+                        for(int $i = 0; $i < $n; $i++)
+                            $chunks[$i] = $expressions.get($i) + "#" + $chunks[$i];
                         $message=implode("|",$chunks);
                     }
                 }
-                $message=CChoiceFormat.format($message,$params[0]);
+                $message=CChoiceFormat.format($message, $params.get(0));
             }
             if(!isset($params, "{n}"))
-                $params["{n}"]=$params[0];
-            unset($params[0]);
+                $params.put("{n}", $params.get(0));
+            $params.remove(0);
         }
         return $params!=array() ? strtr($message,$params) : $message;
     }

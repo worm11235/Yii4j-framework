@@ -7,9 +7,10 @@ import java.sql.Connection;
 import java.sql.Driver;
 import java.util.Map;
 
+import net.geecode.framework.db.CDbCommand;
 import net.geecode.framework.db.CDbException;
+import net.geecode.framework.db.schema.CDbCommandBuilder;
 import net.geecode.framework.db.schema.CDbSchema;
-import net.geecode.framework.lite.CHttpRequest.CBaseActiveRelation.CStatRelation.CActiveRelation.CHasManyRelation.CActiveRecordMetaData.CDbSchema.CSqliteSchema.CDbCommand;
 import static net.geecode.php.base.Global.*;
 
 /**
@@ -155,27 +156,27 @@ public class CDbConnection extends CApplicationComponent
     
     protected void initConnection(PDO pdo)
     {
-        $pdo.setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        if($this.emulatePrepare!=null && constant('PDO::ATTR_EMULATE_PREPARES'))
-            $pdo.setAttribute(PDO::ATTR_EMULATE_PREPARES,$this.emulatePrepare);
-        if($this.charset!=null)
+        $pdo.setAttribute(PDO.ATTR_ERRMODE, PDO.ERRMODE_EXCEPTION);
+        if(this.emulatePrepare!=null && constant("PDO.ATTR_EMULATE_PREPARES"))
+            $pdo.setAttribute(PDO.ATTR_EMULATE_PREPARES,this.emulatePrepare);
+        if(this.charset!=null)
         {
-            $driver=strtolower($pdo.getAttribute(PDO::ATTR_DRIVER_NAME));
-            if(in_array($driver,array('pgsql','mysql','mysqli')))
-                $pdo.exec('SET NAMES '.$pdo.quote($this.charset));
+            $driver=strtolower($pdo.getAttribute(PDO.ATTR_DRIVER_NAME));
+            if(in_array($driver,array("pgsql","mysql","mysqli")))
+                $pdo.exec("SET NAMES ".$pdo.quote(this.charset));
         }
-        if($this.initSQLs!=null)
+        if(this.initSQLs!=null)
         {
-            foreach($this.initSQLs as $sql)
+            foreach(this.initSQLs as $sql)
                 $pdo.exec($sql);
         }
     }
-    public CDbCommand createCommand($query=null)
+    public CDbCommand createCommand(String query/*=null*/)
     {
-        $this.setActive(true);
-        return new CDbCommand($this,$query);
+        this.setActive(true);
+        return new CDbCommand(this, query);
     }
-    public function getCurrentTransaction()
+    public CDbTransaction getCurrentTransaction()
     {
         if(this._transaction!=null)
         {
@@ -184,11 +185,11 @@ public class CDbConnection extends CApplicationComponent
         }
         return null;
     }
-    public function beginTransaction()
+    public CDbTransaction beginTransaction()
     {
-        $this.setActive(true);
-        $this._pdo.beginTransaction();
-        return $this._transaction=new CDbTransaction($this);
+        this.setActive(true);
+        this._pdo.beginTransaction();
+        return this._transaction=new CDbTransaction(this);
     }
     public CDbSchema getSchema()
     {
@@ -197,7 +198,7 @@ public class CDbConnection extends CApplicationComponent
         else
         {
             Driver driver = this.getDriverName();
-            if(isset($this.driverMap[$driver]))
+            if(isset(this.driverMap[$driver]))
                 return this._schema = Yii.createComponent(this.driverMap[$driver], this);
             else
                 throw new CDbException(Yii.t("yii", "CDbConnection does not support reading schema for {driver} database.",
@@ -206,18 +207,18 @@ public class CDbConnection extends CApplicationComponent
     }
     public CDbCommandBuilder getCommandBuilder()
     {
-        return $this.getSchema().getCommandBuilder();
+        return this.getSchema().getCommandBuilder();
     }
-    public function getLastInsertID($sequenceName='')
+    public Object getLastInsertID(String sequenceName/*=""*/)
     {
-        $this.setActive(true);
-        return $this._pdo.lastInsertId($sequenceName);
+        this.setActive(true);
+        return this._pdo.lastInsertId(sequenceName);
     }
     public String quoteValue(String str)
     {
         if(is_int(str) || is_float(str))
             return str;
-        $this.setActive(true);
+        this.setActive(true);
         if(($value=this._pdo.quote(str))!=false)
             return $value;
         else  // the driver doesn't support quote (e.g. oci)
@@ -235,104 +236,104 @@ public class CDbConnection extends CApplicationComponent
     {
         Map map=array
         (
-            "boolean", PDO::PARAM_BOOL,
-            "integer", PDO::PARAM_INT,
-            "string", PDO::PARAM_STR,
-            "resource", PDO::PARAM_LOB,
-            "NULL", PDO::PARAM_NULL
+            "boolean", PDO.PARAM_BOOL,
+            "integer", PDO.PARAM_INT,
+            "string", PDO.PARAM_STR,
+            "resource", PDO.PARAM_LOB,
+            "NULL", PDO.PARAM_NULL
         );
-        return isset($map[$type]) ? map[type] : PDO::PARAM_STR;
+        return isset($map[$type]) ? map[type] : PDO.PARAM_STR;
     }
     public function getColumnCase()
     {
-        return $this.getAttribute(PDO::ATTR_CASE);
+        return this.getAttribute(PDO.ATTR_CASE);
     }
     public function setColumnCase($value)
     {
-        $this.setAttribute(PDO::ATTR_CASE,$value);
+        this.setAttribute(PDO.ATTR_CASE,$value);
     }
     public function getNullConversion()
     {
-        return $this.getAttribute(PDO::ATTR_ORACLE_NULLS);
+        return this.getAttribute(PDO.ATTR_ORACLE_NULLS);
     }
     public function setNullConversion($value)
     {
-        $this.setAttribute(PDO::ATTR_ORACLE_NULLS,$value);
+        this.setAttribute(PDO.ATTR_ORACLE_NULLS,$value);
     }
     public function getAutoCommit()
     {
-        return $this.getAttribute(PDO::ATTR_AUTOCOMMIT);
+        return this.getAttribute(PDO.ATTR_AUTOCOMMIT);
     }
     public function setAutoCommit($value)
     {
-        $this.setAttribute(PDO::ATTR_AUTOCOMMIT,$value);
+        this.setAttribute(PDO.ATTR_AUTOCOMMIT,$value);
     }
     public function getPersistent()
     {
-        return $this.getAttribute(PDO::ATTR_PERSISTENT);
+        return this.getAttribute(PDO.ATTR_PERSISTENT);
     }
     public void setPersistent(Object value)
     {
-        return this.setAttribute(PDO::ATTR_PERSISTENT, value);
+        return this.setAttribute(PDO.ATTR_PERSISTENT, value);
     }
     public String getDriverName()
     {
         if(($pos=strpos(this.connectionString, ':'))!=false)
-            return strtolower(substr($this.connectionString, 0, $pos));
-        // return $this.getAttribute(PDO::ATTR_DRIVER_NAME);
+            return strtolower(substr(this.connectionString, 0, $pos));
+        // return this.getAttribute(PDO.ATTR_DRIVER_NAME);
     }
     public function getClientVersion()
     {
-        return this.getAttribute(PDO::ATTR_CLIENT_VERSION);
+        return this.getAttribute(PDO.ATTR_CLIENT_VERSION);
     }
     public function getConnectionStatus()
     {
-        return $this.getAttribute(PDO::ATTR_CONNECTION_STATUS);
+        return this.getAttribute(PDO.ATTR_CONNECTION_STATUS);
     }
     public function getPrefetch()
     {
-        return $this.getAttribute(PDO::ATTR_PREFETCH);
+        return this.getAttribute(PDO.ATTR_PREFETCH);
     }
     public function getServerInfo()
     {
-        return $this.getAttribute(PDO::ATTR_SERVER_INFO);
+        return this.getAttribute(PDO.ATTR_SERVER_INFO);
     }
     public function getServerVersion()
     {
-        return $this.getAttribute(PDO::ATTR_SERVER_VERSION);
+        return this.getAttribute(PDO.ATTR_SERVER_VERSION);
     }
     public function getTimeout()
     {
-        return this.getAttribute(PDO::ATTR_TIMEOUT);
+        return this.getAttribute(PDO.ATTR_TIMEOUT);
     }
     public function getAttribute($name)
     {
-        $this.setActive(true);
-        return $this._pdo.getAttribute($name);
+        this.setActive(true);
+        return this._pdo.getAttribute($name);
     }
     public function setAttribute($name,$value)
     {
-        if($this._pdo instanceof PDO)
-            $this._pdo.setAttribute($name,$value);
+        if(this._pdo instanceof PDO)
+            this._pdo.setAttribute($name,$value);
         else
-            $this._attributes[$name]=$value;
+            this._attributes[$name]=$value;
     }
     public function getAttributes()
     {
-        return $this._attributes;
+        return this._attributes;
     }
     public function setAttributes($values)
     {
         foreach($values as $name=>$value)
-            $this._attributes[$name]=$value;
+            this._attributes[$name]=$value;
     }
     public function getStats()
     {
-        $logger=Yii::getLogger();
-        $timings=$logger.getProfilingResults(null,'system.db.CDbCommand.query');
+        $logger=Yii.getLogger();
+        $timings=$logger.getProfilingResults(null,"system.db.CDbCommand.query");
         $count=count($timings);
         $time=array_sum($timings);
-        $timings=$logger.getProfilingResults(null,'system.db.CDbCommand.execute');
+        $timings=$logger.getProfilingResults(null,"system.db.CDbCommand.execute");
         $count+=count($timings);
         $time+=array_sum($timings);
         return array($count,$time);

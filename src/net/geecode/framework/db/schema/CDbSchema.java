@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 import net.geecode.framework.base.CComponent;
 import net.geecode.framework.db.CDbException;
 import net.geecode.framework.lite.CDbConnection;
+import net.geecode.framework.lite.ICache;
 import net.geecode.framework.lite.Yii;
 
 /**
@@ -107,16 +108,16 @@ public abstract class CDbSchema extends CComponent
                 this._connection.queryCachingDuration=0;
             }
 
-            Object cache;
+            ICache cache;
             int duration;
             if(!isset(this._cacheExclude, name)
                     && (duration=this._connection.schemaCachingDuration)>0
                     && this._connection.schemaCacheID != null
-                    && (cache = Yii.app().getComponent(this._connection.schemaCacheID))!=null)
+                    && (cache = (ICache) Yii.app().getComponent(this._connection.schemaCacheID))!=null)
             {
                 String key = "yii:dbschema" + this._connection.connectionString
                         + ":" + this._connection.username + ":" + name;
-                table = cache.get(key);
+                table = (CDbTableSchema) cache.get(key);
                 if (refresh == true || table == null)
                 {
                     table = this.loadTable(realName);
@@ -191,7 +192,7 @@ public abstract class CDbSchema extends CComponent
     public void refresh()
     {
         int duration = this._connection.schemaCachingDuration;
-        Object cache = Yii.app().getComponent(this._connection.schemaCacheID);
+        ICache cache = (ICache) Yii.app().getComponent(this._connection.schemaCacheID);
         if((duration)>0
                 && this._connection.schemaCacheID != null
                 && (cache) != null)

@@ -12,10 +12,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import net.geecode.framework.base.CComponent;
+import net.geecode.framework.db.CDbCommand;
 import net.geecode.framework.db.CDbException;
 import net.geecode.framework.lite.CDbConnection;
 import net.geecode.framework.lite.Yii;
-
 import static net.geecode.php.base.Global.*;
 
 /**
@@ -67,9 +67,17 @@ public class CDbCommandBuilder extends CComponent
      */
     public Object getLastInsertID(Object table)
     {
-        this.ensureTable(table);
-        if (table.sequenceName != null)
-            return this._connection.getLastInsertID(table.sequenceName);
+        CDbTableSchema tab;
+        if (table instanceof CDbTableSchema)
+        {
+            tab = (CDbTableSchema) table;
+        }
+        else
+        {
+            tab = this.ensureTable(table + "");
+        }
+        if (tab.sequenceName != null)
+            return this._connection.getLastInsertID(tab.sequenceName);
         else
             return null;
     }
@@ -81,20 +89,27 @@ public class CDbCommandBuilder extends CComponent
      * @param string $alias the alias name of the primary table. Defaults to 't'.
      * @return CDbCommand query command.
      */
-    public CDbCommand createFindCommand(Object table, CDbCriteria criteria,
+    public CDbCommand createFindCommand(Object tab, CDbCriteria criteria,
             String alias/*='t'*/)
     {
-        this.ensureTable(table);
-        select = is_array(criteria.select) ? implode(", ", criteria.select)
-                : criteria.select;
+        CDbTableSchema table;
+        if (tab instanceof CDbTableSchema)
+        {
+            table = (CDbTableSchema) tab;
+        }
+        else
+        {
+            table = this.ensureTable(tab + "");
+        }
+        String select = implode(", ", criteria.select);
         if(criteria.alias != "")
             alias = criteria.alias;
         alias = this._schema.quoteTableName(alias);
 
         // issue 1432: need to expand * when SQL has JOIN
-        if(select == "*" && !empty(criteria.join))
+        if(select == "*" && !(criteria.join.isEmpty()))
         {
-            prefix = alias+".";
+            String prefix = alias+".";
             select = array();
             for(table.getColumnNames() as name)
                 $select[]=$prefix.this._schema.quoteColumnName($name);
@@ -594,7 +609,7 @@ public class CDbCommandBuilder extends CComponent
      * @param CDbCommand $command database command
      * @param array $values values for binding (integer-indexed array for question mark placeholders, string-indexed array for named placeholders)
      */
-    public void bindValues(CDbCommand command, Map<K, V> values)
+    public void bindValues(CDbCommand command, Map values)
     {
         if((n = values.size()) == 0)
             return;
